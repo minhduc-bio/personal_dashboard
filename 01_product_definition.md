@@ -5,3 +5,6 @@
 ## Personal Workspace này giải quyết được những vấn đề gì:
 - Hiện tại, workflow của tôi không được tối ưu do nằm rải rác ở các công cụ quản lý của Google Workspace, không được liền mạch và khiến cho tôi bị mất tập trung vào công việc, dễ gây quên hay không thể sử dụng lâu dài. 
 - Personal Workspace này sẽ như một công cụ all-in-one, giúp tôi đều có thể làm việc, học tập trên chính công cụ này. 
+
+## Personal Workspace trên không giải quyết vấn đề gì?
+- Personal Workspace gần như chỉ tích hợp và hiển thị trạng thái, navigation cho từng tác vụ (trừ tác vụ plannig và file organization). Các tác vụ khác với documents, spreadsheet, mail writting sẽ được direct về service của Google Workspace trên web, đảm bảo độ chính xác của thao tác. 
