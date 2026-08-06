@@ -179,9 +179,9 @@ Vì free plan không có Claude Code, quy trình sẽ là **copy-paste có kiể
 
 Thực hiện thủ công, ghi kết quả:
 
-- [ ] Tắt/mở lại token vẫn còn hiệu lực (không phải login lại)
+- [x] Tắt/mở lại token vẫn còn hiệu lực (không phải login lại)
 - [ ] Recurring event hiển thị đủ, không trùng
-- [ ] Giờ hiển thị đúng UTC+7
+- [x] Giờ hiển thị đúng UTC+7
 - [ ] Đi hết vòng đời DailySession 1 lần thủ công qua CLI
 - [ ] Test lọc Task theo Mood cho cả 3 mood
 - [ ] Tắt máy, mở lại, dữ liệu Task/Session không mất

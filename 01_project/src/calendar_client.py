@@ -6,8 +6,7 @@ import os, datetime
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 TOKEN_PATH = "token.json"
-CREDS_PATH = "credentials.json"
-
+CREDS_PATH = "C:/Users/Admin/Downloads/03_Dashboard/idea/01_project/credentials.json"
 def get_service():
     creds = None
     if os.path.exists(TOKEN_PATH):
@@ -24,7 +23,7 @@ def get_service():
 
 def list_upcoming_events(max_results=10):
     service = get_service()
-    now = datetime.datetime.utcnow().isoformat() + "Z"
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     events_result = service.events().list(
         calendarId="primary", timeMin=now,
         maxResults=max_results, singleEvents=True,
