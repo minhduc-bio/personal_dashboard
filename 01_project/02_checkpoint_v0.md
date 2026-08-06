@@ -8,44 +8,44 @@
     
       
     
-- [ ] **Thư mục tự tạo:** Nhìn sang thanh Explorer của trình soạn thảo, kiểm tra xem thư mục `data/` và `data/sessions/` đã tự động sinh ra chưa.
+- [x] **Thư mục tự tạo:** Nhìn sang thanh Explorer của trình soạn thảo, kiểm tra xem thư mục `data/` và `data/sessions/` đã tự động sinh ra chưa.
     
       
     
 
 ### 2. Kiểm tra Menu 1: Tích hợp Google Calendar
 
-- [ ] **Hiển thị lịch:** Gõ `1`. Danh sách sự kiện có hiện ra đúng như khi bạn test API độc lập trước đó không?
+- [x] **Hiển thị lịch:** Gõ `1`. Danh sách sự kiện có hiện ra đúng như khi bạn test API độc lập trước đó không?
     
       
     
-- [ ] **Luồng điều hướng:** Nhấn Enter để xem hệ thống có quay về Bảng điều khiển chính một cách mượt mà (không bị văng khỏi chương trình) không.
+- [x] **Luồng điều hướng:** Nhấn Enter để xem hệ thống có quay về Bảng điều khiển chính một cách mượt mà (không bị văng khỏi chương trình) không.
     
       
     
 
 ### 3. Kiểm tra Menu 2 & 3: Quản lý Công việc (Task)
 
-- [ ] **Thêm Task (Đúng chuẩn):** Gõ `2`, tạo một công việc mới (VD: "Review code") và nhập mức năng lượng chuẩn (`High`, `Neutral`, hoặc `Low`).
+- [x] **Thêm Task (Đúng chuẩn):** Gõ `2`, tạo một công việc mới (VD: "Review code") và nhập mức năng lượng chuẩn (`High`, `Neutral`, hoặc `Low`).
     
       
     
-- [ ] **Bắt lỗi validation (Cố tình làm sai):** Gõ `2`, thử thêm một Task nhưng gõ mức năng lượng sai bậy bạ (VD: `Rất cao`). Hệ thống có in ra thông báo lỗi và từ chối lưu không?
+- [x] **Bắt lỗi validation (Cố tình làm sai):** Gõ `2`, thử thêm một Task nhưng gõ mức năng lượng sai bậy bạ (VD: `Rất cao`). Hệ thống có in ra thông báo lỗi và từ chối lưu không?
     
       
     
-- [ ] **Hiển thị danh sách:** Gõ `3`. Các Task vừa tạo có xuất hiện đầy đủ kèm theo biểu tượng ⏳ và mức năng lượng tương ứng không?
+- [x] **Hiển thị danh sách:** Gõ `3`. Các Task vừa tạo có xuất hiện đầy đủ kèm theo biểu tượng ⏳ và mức năng lượng tương ứng không?
     
       
     
 
 ### 4. Kiểm tra Menu 4: Vòng đời Phiên làm việc (Session)
 
-- [ ] **Cập nhật hợp lệ:** Gõ `4`, chuyển trạng thái phiên từ `Created` sang `Planning`. Kiểm tra trên đỉnh Bảng điều khiển xem trạng thái đã được cập nhật chưa.
+- [x] **Cập nhật hợp lệ:** Gõ `4`, chuyển trạng thái phiên từ `Created` sang `Planning`. Kiểm tra trên đỉnh Bảng điều khiển xem trạng thái đã được cập nhật chưa.
     
       
     
-- [ ] **Bắt lỗi trạng thái:** Gõ `4`, thử nhập một trạng thái không có trong thiết kế (VD: `Sleeping`). Hệ thống có chặn lại và báo lỗi không?
+- [x] **Bắt lỗi trạng thái:** Gõ `4`, thử nhập một trạng thái không có trong thiết kế (VD: `Sleeping`). Hệ thống có chặn lại và báo lỗi không?
     
       
     

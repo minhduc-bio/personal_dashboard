@@ -25,13 +25,13 @@ Không có: Gmail, Drive, Docs, Sheets, Google Tasks, OneNote. Không ghi ngư�
 
 ## 3. V0 — Tiêu chí hoàn thành ("Definition of Done")
 
-- [ ] OAuth Calendar chạy được, refresh token không cần đăng nhập lại mỗi ngày
-- [ ] Recurring events (RRULE) hiển thị đúng, không bị thiếu hoặc trùng lịch
-- [ ] Timezone hiển thị đúng giờ Hanoi (UTC+7)
-- [ ] `DailySession` đi hết vòng đời `Created → Planning → Active → Reviewing → Closed` mà không kẹt state
-- [ ] `Mood` (High/Neutral/Low) lọc được `Task` theo `mood_affinity`
-- [ ] Dữ liệu `Task`, `Mood`, `DailySession` lưu local (JSON/Markdown) — không mất dữ liệu khi tắt/mở lại app
-- [ ] Đã tự chạy tay ít nhất 5-7 ngày liên tục để kiểm chứng workflow, không chỉ test 1 lần
+- [x] OAuth Calendar chạy được, refresh token không cần đăng nhập lại mỗi ngày
+- [x] Recurring events (RRULE) hiển thị đúng, không bị thiếu hoặc trùng lịch
+- [x] Timezone hiển thị đúng giờ Hanoi (UTC+7)
+- [x] `DailySession` đi hết vòng đời `Created → Planning → Active → Reviewing → Closed` mà không kẹt state
+- [x] `Mood` (High/Neutral/Low) lọc được `Task` theo `mood_affinity`
+- [x] Dữ liệu `Task`, `Mood`, `DailySession` lưu local (JSON/Markdown) — không mất dữ liệu khi tắt/mở lại app
+- [x] Đã tự chạy tay ít nhất 5-7 ngày liên tục để kiểm chứng workflow, không chỉ test 1 lần
 
 **Chỉ khi tick hết mục trên mới được mở sang v1.**
 
