@@ -37,14 +37,14 @@
 ## Giai đoạn 2 — Setup môi trường code
 
 ```bash
-mkdir personal-workspace-v0 && cd personal-workspace-v0
-git init
-python3 -m venv venv
-source venv/bin/activate      # Windows: venv\Scripts\activate
+cd C:\Users\Admin\Downloads\03_Dashboard\idea\01_project
 
-echo "google-api-python-client
-google-auth-httplib2
-google-auth-oauthlib" > requirements.txt
+python -m venv venv
+venv\Scripts\activate
+
+echo google-api-python-client > requirements.txt
+echo google-auth-httplib2 >> requirements.txt
+echo google-auth-oauthlib >> requirements.txt
 
 pip install -r requirements.txt
 ```
