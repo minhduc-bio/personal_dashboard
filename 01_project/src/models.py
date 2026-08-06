@@ -1,16 +1,17 @@
-# data/tasks.json
-{
-  "id": "t001",
-  "title": "Viết báo cáo tuần",
-  "mood_affinity": "High",       # High | Neutral | Low
-  "status": "pending",           # pending | done
-  "created_at": "2026-08-06"
-}
+from typing import Optional, Literal, List
+from pydantic import BaseModel
 
-# data/sessions/2026-08-06.json
-{
-  "date": "2026-08-06",
-  "state": "Planning",           # Created|Planning|Active|Reviewing|Closed
-  "mood": null,
-  "task_ids": []
-}
+class Task(BaseModel):
+    """Schema định nghĩa cấu trúc cho một công việc (Task)."""
+    id: str
+    title: str
+    mood_affinity: Literal["High", "Neutral", "Low"]
+    status: Literal["pending", "done"]
+    created_at: str
+
+class Session(BaseModel):
+    """Schema định nghĩa cấu trúc cho một phiên làm việc trong ngày (Session)."""
+    date: str
+    state: Literal["Created", "Planning", "Active", "Reviewing", "Closed"]
+    mood: Optional[str] = None
+    task_ids: List[str] = []
