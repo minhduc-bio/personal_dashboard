@@ -1,0 +1,14 @@
+# Không gian làm việc cục bộ (thay đổi liên tục)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+
+# Tùy chọn: Bỏ cấu hình Graph nếu không cần đồng bộ
+# .obsidian/graph.json
+
+# Thùng rác của Obsidian
+.trash/
+
+# File rác hệ điều hành sinh ra
+.DS_Store
+Thumbs.db
+desktop.ini
