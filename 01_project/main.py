@@ -24,6 +24,29 @@ def print_header(session):
     print("=" * 45)
 
 
+MOOD_OPTIONS = ["High", "Neutral", "Low"]
+
+
+def choose_mood(prompt: str, allow_cancel: bool = True):
+    """Cho chọn mood bằng số (1/2/3) thay vì gõ text tự do — loại bỏ hẳn lỗi
+    chính tả/viết hoa-thường mà .capitalize() + validate trước đây vẫn để lọt.
+    Trả về None nếu người dùng hủy (chỉ khi allow_cancel=True)."""
+    print(f"\n{prompt}")
+    for i, m in enumerate(MOOD_OPTIONS, start=1):
+        print(f"{i}. {m}")
+    if allow_cancel:
+        print("0. Hủy")
+
+    while True:
+        choice = input("Chọn (số): ").strip()
+        if allow_cancel and choice == '0':
+            return None
+        if choice in ('1', '2', '3'):
+            return MOOD_OPTIONS[int(choice) - 1]
+        valid = "1, 2, 3" + (" hoặc 0 để hủy" if allow_cancel else "")
+        print(f"Lỗi: chỉ nhận {valid}.")
+
+
 def show_calendar():
     print("\n--- LỊCH (Google Calendar - chỉ đọc) ---")
     try:
@@ -50,20 +73,15 @@ def set_mood(session):
         if change != 'y':
             return
 
-    while True:
-        mood = input("Bạn cảm thấy thế nào hôm nay (High/Neutral/Low, hoặc '0' để Hủy): ").strip()
-        if mood == '0':
-            return
-        mood = mood.capitalize()
-        if mood not in ("High", "Neutral", "Low"):
-            print("Lỗi: chỉ nhận High, Neutral hoặc Low.")
-            continue
-        session.mood = mood
-        # Đặt mood là hành động mở đầu ngày -> Planning
-        session.advance_to("Planning")
-        save_session(session)
-        print(f"-> Đã ghi nhận mood: {mood}")
+    mood = choose_mood("Bạn cảm thấy thế nào hôm nay?")
+    if mood is None:
         return
+
+    session.mood = mood
+    # Đặt mood là hành động mở đầu ngày -> Planning
+    session.advance_to("Planning")
+    save_session(session)
+    print(f"-> Đã ghi nhận mood: {mood}")
 
 
 def add_task(session, tasks):
@@ -75,23 +93,23 @@ def add_task(session, tasks):
         if not title:
             print("Lỗi: Tên công việc không được để trống!")
             continue
+        break
 
-        mood_affinity = input("Task này hợp với mood nào (High/Neutral/Low): ").strip().capitalize()
-        if mood_affinity not in ("High", "Neutral", "Low"):
-            print("Lỗi: chỉ nhận High, Neutral hoặc Low.")
-            continue
-
-        new_task = Task(title=title, mood_affinity=mood_affinity)
-        tasks.append(new_task)
-        save_tasks(tasks)
-
-        session.task_ids.append(new_task.id)
-        # Thêm task vào kế hoạch ngày -> Planning
-        session.advance_to("Planning")
-        save_session(session)
-
-        print(f"-> Đã thêm thành công: '{title}' (mood: {mood_affinity})")
+    mood_affinity = choose_mood("Task này hợp với mood nào?")
+    if mood_affinity is None:
+        print("Đã hủy thêm công việc.")
         return
+
+    new_task = Task(title=title, mood_affinity=mood_affinity)
+    tasks.append(new_task)
+    save_tasks(tasks)
+
+    session.task_ids.append(new_task.id)
+    # Thêm task vào kế hoạch ngày -> Planning
+    session.advance_to("Planning")
+    save_session(session)
+
+    print(f"-> Đã thêm thành công: '{title}' (mood: {mood_affinity})")
 
 
 def list_tasks(tasks, session):
