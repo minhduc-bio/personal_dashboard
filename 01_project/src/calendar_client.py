@@ -1,7 +1,6 @@
 import datetime
 import os
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -20,7 +19,10 @@ DATA_DIR.mkdir(exist_ok=True)
 CREDS_PATH = os.environ.get("GOOGLE_CREDENTIALS_PATH", "credentials.json")
 TOKEN_PATH = os.environ.get("GOOGLE_TOKEN_PATH", str(DATA_DIR / "token.json"))
 
-HANOI_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+# Dùng fixed offset thay vì zoneinfo.ZoneInfo("Asia/Ho_Chi_Minh"): Windows không có sẵn
+# IANA tzdata (cần cài thêm package `tzdata`), còn Hanoi không có DST nên UTC+7 cố định
+# là chính xác quanh năm, không cần phụ thuộc thêm gì.
+HANOI_TZ = datetime.timezone(datetime.timedelta(hours=7))
 
 
 def get_service():
