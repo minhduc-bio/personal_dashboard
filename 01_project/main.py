@@ -1,5 +1,5 @@
+import datetime
 import os
-from datetime import date
 
 from src import calendar_client
 from src.models import Task
@@ -10,10 +10,18 @@ from src.storage import (
     get_or_create_session,
     save_session,
 )
+from src.timezone import APP_TZ, to_app_date
 
 
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
+
+
+def today_local():
+    """Ngày hôm nay theo giờ ứng dụng (Asia/Ho_Chi_Minh) — dùng nhất quán ở
+    mọi nơi cần biết 'hôm nay' (session.date, scheduled_date, so sánh Overdue),
+    thay vì phụ thuộc timezone của hệ điều hành máy chạy app."""
+    return datetime.datetime.now(APP_TZ).date()
 
 
 def print_header(session):
@@ -29,8 +37,7 @@ MOOD_OPTIONS = ["High", "Neutral", "Low"]
 
 def choose_mood(prompt: str, allow_cancel: bool = True):
     """Cho chọn mood bằng số (1/2/3) thay vì gõ text tự do — loại bỏ hẳn lỗi
-    chính tả/viết hoa-thường mà .capitalize() + validate trước đây vẫn để lọt.
-    Trả về None nếu người dùng hủy (chỉ khi allow_cancel=True)."""
+    chính tả/viết hoa-thường. Trả về None nếu người dùng hủy (allow_cancel=True)."""
     print(f"\n{prompt}")
     for i, m in enumerate(MOOD_OPTIONS, start=1):
         print(f"{i}. {m}")
@@ -100,48 +107,94 @@ def add_task(session, tasks):
         print("Đã hủy thêm công việc.")
         return
 
-    new_task = Task(title=title, mood_affinity=mood_affinity)
+    schedule_today = input("Lên lịch cho hôm nay? (y/N — để trống = chưa lên lịch): ").strip().lower()
+    scheduled_date = today_local() if schedule_today == 'y' else None
+
+    new_task = Task(title=title, mood_affinity=mood_affinity, scheduled_date=scheduled_date)
     tasks.append(new_task)
     save_tasks(tasks)
 
-    session.task_ids.append(new_task.id)
-    # Thêm task vào kế hoạch ngày -> Planning
+    # Thêm task vào kế hoạch -> Planning
     session.advance_to("Planning")
     save_session(session)
 
-    print(f"-> Đã thêm thành công: '{title}' (mood: {mood_affinity})")
+    schedule_label = "hôm nay" if scheduled_date else "chưa lên lịch"
+    print(f"-> Đã thêm: '{title}' (mood: {mood_affinity}, {schedule_label})")
+
+
+def _group_tasks(tasks):
+    """Phân nhóm task PENDING theo scheduled_date so với hôm nay:
+    🔴 Overdue (scheduled < hôm nay), 🟡 Today (scheduled == hôm nay),
+    ⚪ Unscheduled (chưa có scheduled_date). Task đã done không nằm trong
+    3 nhóm này — xem đầy đủ lịch sử qua danh sách Xóa công việc (mục 6)."""
+    today = today_local()
+    overdue, today_tasks, unscheduled = [], [], []
+    for t in tasks:
+        if t.status != 'pending':
+            continue
+        if t.scheduled_date is None:
+            unscheduled.append(t)
+        elif t.scheduled_date < today:
+            overdue.append(t)
+        elif t.scheduled_date == today:
+            today_tasks.append(t)
+        # scheduled_date > today (lên lịch tương lai) -> chưa có trong MVP này,
+        # tạm không hiển thị ở đâu cả (chưa cần Reschedule / future view ở MVP)
+    return overdue, today_tasks, unscheduled
 
 
 def list_tasks(tasks, session):
-    print("\n--- DANH SÁCH CÔNG VIỆC ---")
+    print("\n--- CÔNG VIỆC ---")
     if not tasks:
         print("Chưa có công việc nào.")
         return
 
-    shown = tasks
-    if session.mood:
-        do_filter = input(f"Lọc theo mood hôm nay ({session.mood})? (y/N): ").strip().lower()
-        if do_filter == 'y':
-            shown = [t for t in tasks if t.mood_affinity == session.mood]
-            if not shown:
-                print(f"Không có công việc nào hợp mood {session.mood}.")
-                return
+    overdue, today_tasks, unscheduled = _group_tasks(tasks)
 
-    for i, t in enumerate(shown):
-        status_icon = "✅" if t.status == "done" else "⏳"
-        print(f"{i + 1}. [{status_icon}] {t.title} (mood: {t.mood_affinity})")
+    apply_mood_filter = False
+    if session.mood:
+        do_filter = input(f"Lọc Today/Unscheduled theo mood hôm nay ({session.mood})? (y/N): ").strip().lower()
+        apply_mood_filter = do_filter == 'y'
+
+    if apply_mood_filter:
+        # Overdue KHÔNG lọc theo mood — task quá hạn phải luôn hiện đủ để không bị
+        # "biến mất khỏi tầm mắt" chỉ vì không hợp mood hôm nay.
+        today_tasks = [t for t in today_tasks if t.mood_affinity == session.mood]
+        unscheduled = [t for t in unscheduled if t.mood_affinity == session.mood]
+
+    def _print_group(label, group):
+        print(f"\n{label} ({len(group)})")
+        if not group:
+            print("  (không có)")
+            return
+        for t in group:
+            print(f"  - {t.title} (mood: {t.mood_affinity})")
+
+    _print_group("🔴 Overdue", overdue)
+    _print_group("🟡 Today's Tasks", today_tasks)
+    _print_group("⚪ Unscheduled Tasks", unscheduled)
 
 
 def complete_task(session, tasks):
-    pending_tasks = [(i, t) for i, t in enumerate(tasks) if t.status == 'pending']
-
+    pending_tasks = [t for t in tasks if t.status == 'pending']
     if not pending_tasks:
         print("\nKhông có công việc nào đang chờ xử lý.")
         return
 
+    today = today_local()
+
+    def _label(t):
+        if t.scheduled_date is None:
+            return "⚪"
+        if t.scheduled_date < today:
+            return "🔴"
+        if t.scheduled_date == today:
+            return "🟡"
+        return "⚪"
+
     print("\n--- HOÀN THÀNH CÔNG VIỆC ---")
-    for idx, (_, t) in enumerate(pending_tasks):
-        print(f"{idx + 1}. {t.title} (mood: {t.mood_affinity})")
+    for idx, t in enumerate(pending_tasks):
+        print(f"{idx + 1}. {_label(t)} {t.title} (mood: {t.mood_affinity})")
 
     task_choice = input(
         f"\nChọn STT công việc đã xong (1-{len(pending_tasks)}, hoặc '0' để Hủy): "
@@ -159,26 +212,36 @@ def complete_task(session, tasks):
         print("Lỗi: Số thứ tự không hợp lệ.")
         return
 
-    real_idx = pending_tasks[selected_idx][0]
-    tasks[real_idx].status = 'done'
+    target = pending_tasks[selected_idx]
+    target.mark_done()
     save_tasks(tasks)
 
     # Hoàn thành task đầu tiên trong ngày -> Active (đang thực thi kế hoạch)
     session.advance_to("Active")
     save_session(session)
 
-    print(f"-> Tuyệt vời! Đã hoàn thành: '{tasks[real_idx].title}' 🎉")
+    print(f"-> Tuyệt vời! Đã hoàn thành: '{target.title}' 🎉")
 
 
-def delete_task(session, tasks):
+def delete_task(tasks):
     if not tasks:
         print("\nChưa có công việc nào để xóa.")
         return
 
+    today = today_local()
+
+    def _label(t):
+        if t.status == 'done':
+            return "✅"
+        if t.scheduled_date is None:
+            return "⚪"
+        if t.scheduled_date < today:
+            return "🔴"
+        return "🟡"
+
     print("\n--- XÓA CÔNG VIỆC ---")
     for i, t in enumerate(tasks):
-        status_icon = "✅" if t.status == "done" else "⏳"
-        print(f"{i + 1}. [{status_icon}] {t.title} (mood: {t.mood_affinity})")
+        print(f"{i + 1}. {_label(t)} {t.title} (mood: {t.mood_affinity})")
 
     task_choice = input(
         f"\nChọn STT công việc muốn xóa (1-{len(tasks)}, hoặc '0' để Hủy): "
@@ -204,28 +267,28 @@ def delete_task(session, tasks):
 
     tasks.pop(selected_idx)
     save_tasks(tasks)
-
-    # Task có thể đã được gắn vào kế hoạch hôm nay -> gỡ luôn khỏi session cho đồng bộ
-    if target.id in session.task_ids:
-        session.task_ids.remove(target.id)
-        save_session(session)
-
     print(f"-> Đã xóa: '{target.title}'")
 
 
 def end_of_day(session, tasks):
     print("\n--- KẾT THÚC NGÀY ---")
-    confirm = input("Xác nhận đóng phiên hôm nay? Sẽ không thể mở lại. (y/N): ").strip().lower()
+    confirm = input("Xác nhận đóng phiên hôm nay? (y/N): ").strip().lower()
     if confirm != 'y':
         print("Đã hủy.")
         return
 
     session.advance_to("Reviewing")
 
-    today_ids = set(session.task_ids)
-    today_tasks = [t for t in tasks if t.id in today_ids]
-    done_count = sum(1 for t in today_tasks if t.status == 'done')
-    print(f"Tổng kết hôm nay: {done_count}/{len(today_tasks)} công việc hoàn thành.")
+    today = today_local()
+    completed_today = [
+        t for t in tasks if t.completed_at is not None and to_app_date(t.completed_at) == today
+    ]
+    scheduled_today_pending = [
+        t for t in tasks if t.status == 'pending' and t.scheduled_date == today
+    ]
+
+    print(f"Hoàn thành hôm nay: {len(completed_today)} công việc.")
+    print(f"Còn {len(scheduled_today_pending)} công việc lên lịch hôm nay chưa xong.")
 
     session.advance_to("Closed")
     save_session(session)
@@ -241,7 +304,7 @@ def pause():
 def main():
     init_storage()
     tasks = load_tasks()
-    today_str = date.today().isoformat()
+    today_str = today_local().isoformat()
     session = get_or_create_session(today_str)
 
     while True:
@@ -272,17 +335,17 @@ def main():
             continue
 
         print("1. Xem lịch Google Calendar")
-        print("2. Đặt / xem Mood hôm nay")
-        print("3. Thêm công việc mới (Task)")
-        print("4. Xem danh sách công việc")
-        print("5. Đánh dấu hoàn thành công việc")
+        print("2. Xem / đặt Mood hôm nay")
+        print("3. Thêm công việc mới")
+        print("4. Xem công việc")
+        print("5. Đánh dấu hoàn thành")
         print("6. Xóa công việc")
         print("7. Kết thúc ngày")
-        print("0. Thoát và Lưu")
+        print("8. Thoát và lưu")
 
-        choice = input("\nChọn chức năng (0-7): ").strip()
+        choice = input("\nChọn chức năng (1-8): ").strip()
 
-        if choice == '0':
+        if choice == '8':
             print("Đã lưu dữ liệu. Tạm biệt!")
             break
         elif choice == '1':
@@ -301,13 +364,13 @@ def main():
             complete_task(session, tasks)
             pause()
         elif choice == '6':
-            delete_task(session, tasks)
+            delete_task(tasks)
             pause()
         elif choice == '7':
             end_of_day(session, tasks)
             pause()
         else:
-            print("Lỗi: Menu không tồn tại. Vui lòng nhập số từ 0-7.")
+            print("Lỗi: Menu không tồn tại. Vui lòng nhập số từ 1-8.")
             pause()
 
 

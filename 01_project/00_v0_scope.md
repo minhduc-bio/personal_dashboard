@@ -21,7 +21,7 @@ Không có: `Workspace`, `Project`, `Resource`, `ResourceLink`, `DailyReview`, `
 Google Calendar API — READ-ONLY, scope: calendar.readonly
 ```
 
-Không có: Gmail, Drive, Docs, Sheets, Google Tasks, OneNote. Không ghi ngược dữ liệu vào bất kỳ hệ thống ngoài nào ở v0 — chỉ đọc. (Ý định thêm "ghi Task vào Calendar" đã được cân nhắc và **chốt lùi về v3** — xem mục 4, lý do: cần mở scope OAuth ghi + thêm field thời gian vào Task, rủi ro ghi đè dữ liệu thật khi v0 chưa test ổn định.)
+Không có: Gmail, Drive, Docs, Sheets, Google Tasks, OneNote. Không ghi ngược dữ liệu vào bất kỳ hệ thống ngoài nào ở v0 — chỉ đọc. (Ý định thêm "ghi Task vào Calendar" đã được cân nhắc và **chốt lùi về v3** — xem mục 6, lý do: cần mở scope OAuth ghi + thêm field thời gian vào Task, rủi ro ghi đè dữ liệu thật khi v0 chưa test ổn định.)
 
 ## 3. Nguyên tắc state của DailySession — không phải menu thủ công
 
@@ -35,21 +35,95 @@ Active     -> (chọn "Kết thúc ngày")             -> Reviewing -> Closed
 
 State chỉ tiến, không lùi. Một khi `Closed`, phiên hôm đó không nhận thao tác nào khác ngoài thoát app.
 
-## 4. V0 — Tiêu chí hoàn thành ("Definition of Done")
+## 4. Task Lifecycle — Task là Global entity
 
-> Cập nhật 2026-08-07: code đã refactor để đáp ứng các mục dưới, nhưng **chưa tick** cho tới khi tự chạy tay thật kiểm chứng — tránh lặp lại tình trạng DoD khai xong việc chưa làm.
+`Task` **không** gắn cứng vào 1 `DailySession`. Task chưa hoàn thành vẫn tồn tại nguyên vẹn khi sang ngày mới — không tự động xóa, không tự động "chuyển" thành task của ngày mới.
 
-- [x] OAuth Calendar chạy được, refresh token không cần đăng nhập lại mỗi ngày
-- [x] Recurring events (RRULE) hiển thị đúng, không bị thiếu hoặc trùng lịch
-- [x] Timezone hiển thị đúng giờ Hanoi (UTC+7)
+`Task.scheduled_date` là **single source of truth** cho việc task thuộc về ngày nào:
+```text
+scheduled_date = hôm nay          -> Today's Tasks
+scheduled_date < hôm nay + pending -> Overdue
+Chưa có scheduled_date            -> Unscheduled
+```
+`DailySession` không lưu danh sách Task của riêng nó (không có field `task_ids`) — tránh 2 nguồn sự thật lệch nhau (VD: task Overdue được hoàn thành hôm nay không nghĩa là nó "thuộc về" session hôm nay). Cuối ngày (`Kết thúc ngày`), số liệu tổng kết được derive trực tiếp từ `Task.completed_at`, không cần Session tham chiếu ngược.
+
+**Complete và Delete tách biệt**, không gộp chung — khác ý nghĩa dữ liệu:
+- Complete: giữ nguyên task, đổi `status`, ghi `completed_at` để tracking.
+- Delete: xóa hẳn khỏi hệ thống, không giữ log (hard delete).
+
+Overdue tích hợp trực tiếp vào "Xem công việc" (không có menu riêng). **Chưa có Reschedule** ở v0 — nếu trong lúc dùng thật thấy Overdue tồn đọng gây khó chịu (chỉ có 2 lựa chọn Complete/Delete cho task quá hạn nhưng chưa muốn làm), đó là tín hiệu cân nhắc thêm Reschedule sớm hơn kế hoạch.
+
+### Timestamp & timezone
+
+`created_at`/`completed_at` luôn lưu **UTC-aware datetime** — không tự convert giờ local ở tầng model. Muốn biết task/thời điểm thuộc "ngày nào" theo giờ người dùng, luôn đi qua `src/timezone.py::to_app_date()`, không so sánh trực tiếp `.date()` của timestamp UTC (sai lệch quanh mốc nửa đêm giờ Hanoi).
+
+Timezone ứng dụng (`Asia/Ho_Chi_Minh`, hiện dùng fixed offset UTC+7) định nghĩa **một chỗ duy nhất**: `src/timezone.py` (`APP_TZ`). `models.py` và `calendar_client.py` import từ đây, không tự định nghĩa riêng.
+
+## 5. V0 — Tiêu chí hoàn thành ("Definition of Done")
+
+> Cập nhật 2026-08-07 (lần 2): Task Lifecycle ở mục 4 vừa thay đổi khá căn bản
+> cách Task vận hành (Global thay vì ngầm-định gắn-theo-session, thêm Overdue,
+> tách Complete/Delete) — **quyết định chủ đích reset lại DoD về chưa tick**,
+> vì workflow đang được kiểm chứng đã đổi bản chất giữa chừng, không thể tính
+> tiếp những ngày test trước đó.
+
+- [ ] OAuth Calendar chạy được, refresh token không cần đăng nhập lại mỗi ngày *(cần vài ngày thật mới lộ ra)*
+- [ ] Recurring events (RRULE) hiển thị đúng, không bị thiếu hoặc trùng lịch
+- [ ] Timezone hiển thị đúng giờ Hanoi (UTC+7), kể cả quanh mốc nửa đêm
 - [ ] `DailySession` đi hết vòng đời `Created → Planning → Active → Reviewing → Closed` mà không kẹt state (state tự động, xem mục 3)
-- [ ] `Mood` (High/Neutral/Low) lọc được `Task` theo `mood_affinity`
-- [ ] Dữ liệu `Task`, `Mood`, `DailySession` lưu local (JSON/Markdown) — không mất dữ liệu khi tắt/mở lại app
+- [ ] `Mood` (High/Neutral/Low) lọc được `Task` theo `mood_affinity` (chỉ áp cho Today/Unscheduled, Overdue luôn hiện đủ)
+- [ ] Task Overdue/Today/Unscheduled hiển thị đúng nhóm, đúng theo giờ local
+- [ ] Complete và Delete hoạt động đúng, không lẫn lộn ý nghĩa dữ liệu
+- [ ] Dữ liệu `Task`, `Mood`, `DailySession` lưu local (JSON) — không mất dữ liệu khi tắt/mở lại app
 - [ ] Đã tự chạy tay ít nhất 5-7 ngày liên tục để kiểm chứng workflow, không chỉ test 1 lần
 
 **Chỉ khi tick hết mục trên mới được mở sang v1.**
 
-## 5. Tương lai phát triển (sau khi v0 chạy ổn)
+## 6. Tương lai phát triển (sau khi v0 chạy ổn)
+
+### v1 — Mở rộng domain, vẫn giữ tối giản UI
+```text
++ Workspace (container tổng, chưa cần UI riêng)
++ Project (gắn Task vào nhiều DailySession)
++ ResourceLink (chỉ dạng đọc — mở file Drive/local, không edit tại chỗ)
++ DailyReview (rate mood/stress/achievement cuối ngày → ghi CSV)
++ Reschedule cho Task (nếu Overdue-không-Reschedule gây khó chịu thật trong lúc dùng v0)
+```
+Vẫn CLI hoặc UI rất đơn giản. Mục tiêu v1: domain model đầy đủ hơn nhưng **chưa đụng vào UI thật**.
+
+### v2 — UI thật (TypeScript, xây bằng Bolt AI)
+```text
++ Giao diện Dashboard: Start of Day / During Day / End of Day
++ Mood picker dạng dialog
++ Calendar view (Today/Week/Month) kéo-thả Task vào Schedule
++ Kết nối UI với backend v0/v1 qua API nội bộ (REST hoặc tRPC)
+```
+Lưu ý khi vibe code UI bằng Bolt AI:
+- Backend (auth, state machine) **giữ nguyên đã test ở v0/v1** — Bolt AI chỉ nên chạm vào phần UI/API layer, không viết lại logic domain đã ổn định.
+- TypeScript giúp bắt lỗi kiểu dữ liệu giữa UI và API response (đặc biệt hữu ích khi domain model nhiều entity như trong `04_domain_model.md`), nhưng không thay được việc test tay các luồng OAuth/timezone đã nêu ở mục 5.
+- Nên định nghĩa API contract (request/response shape của `DailySession`, `Task`, `Mood`) thành file `.ts` types **trước khi** để Bolt AI generate UI, để tránh UI và backend lệch schema.
+
+### v3 — Ghi ngược & tích hợp mở rộng
+```text
++ Ghi Task vào Google Calendar (không chỉ đọc)
++ Gmail preview (đọc), Drive file picker
++ Sandbox tạm cho note trong ngày
+```
+Đây là lúc rủi ro ghi-đè dữ liệu thật xuất hiện trở lại — chỉ mở sau khi v0-v2 đã dùng thật, ổn định. Điều kiện tối thiểu trước khi mở: đổi OAuth scope sang quyền ghi (`calendar` thay vì `calendar.readonly`), và `Task` cần thêm field thời gian (`deadline`, `estimated_duration`) để có đủ dữ liệu tạo Calendar Event hợp lệ.
+
+### v4+ — Tính năng phụ trợ
+```text
+Pomodoro
+Terminal integration
+OneNote link
+```
+
+## 7. Nguyên tắc chống scope creep
+
+- Mỗi lần muốn thêm object/integration mới: hỏi "đang ở v mấy?" — nếu chưa tick hết Definition of Done của v hiện tại, không thêm.
+- Nếu AI (Claude, Bolt AI, hay bất kỳ) tự đề xuất thêm tính năng "cho tiện", đối chiếu với file này trước khi chấp nhận.
+- File này có thể sửa, nhưng sửa là quyết định có chủ đích — không để nó tự phình ra qua từng prompt.
+- Khi một thay đổi đủ lớn để làm thay đổi bản chất workflow đang test (như Task Lifecycle ở mục 4), reset lại đồng hồ DoD thay vì cộng dồn ngày test cũ — ngày test trên 1 workflow đã đổi bản chất không còn phản ánh đúng workflow hiện tại.
 
 ### v1 — Mở rộng domain, vẫn giữ tối giản UI
 ```text

@@ -7,6 +7,8 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
+from src.timezone import APP_TZ
+
 # V0 — CHỈ ĐỌC. Không đổi scope này sang quyền ghi ở v0 (xem 00_v0_scope.md mục 2).
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
@@ -18,11 +20,6 @@ DATA_DIR.mkdir(exist_ok=True)
 # cùng chỗ với data khác của app để nhất quán với storage.py.
 CREDS_PATH = os.environ.get("GOOGLE_CREDENTIALS_PATH", "credentials.json")
 TOKEN_PATH = os.environ.get("GOOGLE_TOKEN_PATH", str(DATA_DIR / "token.json"))
-
-# Dùng fixed offset thay vì zoneinfo.ZoneInfo("Asia/Ho_Chi_Minh"): Windows không có sẵn
-# IANA tzdata (cần cài thêm package `tzdata`), còn Hanoi không có DST nên UTC+7 cố định
-# là chính xác quanh năm, không cần phụ thuộc thêm gì.
-HANOI_TZ = datetime.timezone(datetime.timedelta(hours=7))
 
 
 def get_service():
@@ -59,7 +56,7 @@ def list_upcoming_events(max_results=20):
     thành từng instance riêng lẻ trước khi lọc.
     """
     service = get_service()
-    now_hanoi = datetime.datetime.now(HANOI_TZ)
+    now_hanoi = datetime.datetime.now(APP_TZ)
     start_of_day = now_hanoi.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_day = start_of_day + datetime.timedelta(days=1)
 
@@ -91,8 +88,8 @@ def list_upcoming_events(max_results=20):
             # đã qua giờ kết thúc -> "xóa dòng" bằng cách không đưa vào kết quả
             continue
 
-        start_str = start_dt.astimezone(HANOI_TZ).strftime("%H:%M")
-        end_str = end_dt.astimezone(HANOI_TZ).strftime("%H:%M")
+        start_str = start_dt.astimezone(APP_TZ).strftime("%H:%M")
+        end_str = end_dt.astimezone(APP_TZ).strftime("%H:%M")
         time_range = f"{start_str} - {end_str}"
         if start_dt <= now_hanoi <= end_dt:
             time_range += " (🔴 Đang diễn ra)"

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import datetime
 import uuid
-from datetime import datetime, timezone
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
@@ -16,28 +16,54 @@ STATE_ORDER: List[SessionState] = ["Created", "Planning", "Active", "Reviewing",
 
 
 class Task(BaseModel):
-    """Đơn vị hành động người dùng cần thực hiện trong ngày (04_domain_model.md mục 7)."""
+    """Task là Global entity — KHÔNG gắn cứng vào 1 DailySession cụ thể.
+
+    `Task.scheduled_date` là single source of truth cho việc task thuộc về
+    ngày nào (Today / Overdue / Unscheduled) — DailySession không lưu danh
+    sách Task nào của riêng nó (xem thêm ghi chú trong Session bên dưới).
+
+    `created_at`/`completed_at` luôn lưu dưới dạng UTC-aware datetime — KHÔNG
+    tự convert sang giờ local ở tầng model. Muốn biết task thuộc "ngày nào"
+    theo giờ người dùng, dùng `src.timezone.to_app_date()` ở tầng gọi (main.py),
+    không so sánh trực tiếp phần .date() của timestamp UTC.
+    """
 
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:8])
     title: str
     mood_affinity: MoodLevel
     status: TaskStatus = "pending"
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    scheduled_date: Optional[datetime.date] = None
+    created_at: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    completed_at: Optional[datetime.datetime] = None
+
+    def mark_done(self) -> None:
+        """Complete: giữ nguyên dữ liệu, chỉ đổi status + ghi completed_at để tracking.
+        Tách biệt hẳn với xóa (Delete) — hai hành động mang ý nghĩa dữ liệu khác nhau.
+        """
+        self.status = "done"
+        self.completed_at = datetime.datetime.now(datetime.timezone.utc)
 
 
 class Session(BaseModel):
     """DailySession — một chu kỳ làm việc trong ngày (04_domain_model.md mục 4).
 
-    QUAN TRỌNG: `state` không được set thủ công qua menu UI. Nó chỉ tự động tiến lên
-    (xem `advance_to`) khi người dùng thực hiện đúng hành động tương ứng — mô phỏng
-    chuỗi Start of Day -> During Day -> End of Day trong 03_workflow.md, không phải
-    một tính năng "chuyển state" độc lập.
+    KHÔNG lưu danh sách Task (không có field task_ids). "Task nào thuộc về
+    ngày nào" là câu hỏi chỉ Task mới trả lời được (qua scheduled_date /
+    completed_at) — Session không nhân đôi quan hệ đó để tránh 2 nguồn sự
+    thật lệch nhau (VD: task Overdue được hoàn thành hôm nay không có nghĩa
+    nó "thuộc về" session hôm nay).
+
+    `state` không được set thủ công qua menu UI. Nó chỉ tự động tiến lên
+    (xem `advance_to`) khi người dùng thực hiện đúng hành động tương ứng —
+    mô phỏng chuỗi Start of Day -> During Day -> End of Day trong
+    03_workflow.md, không phải một tính năng "chuyển state" độc lập.
     """
 
     date: str
     state: SessionState = "Created"
     mood: Optional[MoodLevel] = None
-    task_ids: List[str] = Field(default_factory=list)
 
     def advance_to(self, target: SessionState) -> bool:
         """Tiến state tới `target` nếu target đứng sau state hiện tại trong vòng đời.

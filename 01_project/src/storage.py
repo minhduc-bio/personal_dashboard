@@ -40,8 +40,10 @@ def load_tasks() -> List[Task]:
 def save_tasks(tasks: List[Task]):
     """Lưu danh sách object Task xuống file tasks.json."""
     with open(TASKS_FILE, "w", encoding="utf-8") as f:
-        # Pydantic hỗ trợ model_dump() để chuyển Object về dict chuẩn JSON
-        data = [task.model_dump() for task in tasks]
+        # mode="json" bắt buộc ở đây: Task giờ có field datetime/date
+        # (created_at, completed_at, scheduled_date) — mode="json" tự convert
+        # chúng thành chuỗi ISO hợp lệ để json.dump() không lỗi.
+        data = [task.model_dump(mode="json") for task in tasks]
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
