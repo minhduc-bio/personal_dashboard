@@ -233,10 +233,16 @@ Task-to-do phục vụ trực tiếp cho một Goal.
 ### Goal
 
 Goal là lớp abstraction cao hơn Task.
-
-```text
 Goal
  ├── Task-goal-directed
  ├── Task-goal-directed
  ├── Task-goal-directed
  └── ...
+
+### Routine Task — v1
+
+Task có thể được cấu hình lặp lại theo recurrence (ban đầu: daily).
+Routine Task không sinh Overdue; completion được tracking theo từng calendar date.
+Task vẫn tồn tại độc lập với Schedule.
+
+[[Future Implementation]]
