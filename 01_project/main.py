@@ -171,6 +171,12 @@ def end_of_day(session, tasks):
     print("-> Phiên đã đóng. Hẹn gặp lại ngày mai!")
 
 
+def pause():
+    """Giữ kết quả hành động vừa rồi trên màn hình cho tới khi người dùng đọc xong,
+    rồi mới clear để vẽ lại đúng 1 bảng điều khiển — tránh xả rác shell."""
+    input("\n(Nhấn Enter để quay lại menu...)")
+
+
 def main():
     init_storage()
     tasks = load_tasks()
@@ -178,6 +184,7 @@ def main():
     session = get_or_create_session(today_str)
 
     while True:
+        clear_screen()
         print_header(session)
 
         if session.state == "Closed":
@@ -187,6 +194,7 @@ def main():
                 print("Tạm biệt!")
                 break
             print("Lỗi: phiên đã đóng, không còn thao tác nào khác.")
+            pause()
             continue
 
         print("1. Xem lịch Google Calendar")
@@ -204,18 +212,25 @@ def main():
             break
         elif choice == '1':
             show_calendar()
+            pause()
         elif choice == '2':
             set_mood(session)
+            pause()
         elif choice == '3':
             add_task(session, tasks)
+            pause()
         elif choice == '4':
             list_tasks(tasks, session)
+            pause()
         elif choice == '5':
             complete_task(session, tasks)
+            pause()
         elif choice == '6':
             end_of_day(session, tasks)
+            pause()
         else:
             print("Lỗi: Menu không tồn tại. Vui lòng nhập số từ 0-6.")
+            pause()
 
 
 if __name__ == "__main__":
