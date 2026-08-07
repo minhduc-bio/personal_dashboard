@@ -206,12 +206,25 @@ def main():
         print_header(session)
 
         if session.state == "Closed":
-            print("Phiên hôm nay đã đóng. Chỉ có thể thoát.")
-            choice = input("\nNhập 0 để thoát: ").strip()
+            print("Phiên hôm nay đã đóng.")
+            print("0. Thoát")
+            print("r. Mở lại phiên (CHỈ DÙNG KHI TEST — không dùng lúc vận hành thật)")
+            choice = input("\nChọn (0/r): ").strip().lower()
             if choice == '0':
                 print("Tạm biệt!")
                 break
-            print("Lỗi: phiên đã đóng, không còn thao tác nào khác.")
+            if choice == 'r':
+                confirm = input(
+                    "Xác nhận mở lại phiên để test? Việc này KHÔNG phản ánh vòng đời "
+                    "thật của một ngày làm việc (y/N): "
+                ).strip().lower()
+                if confirm == 'y':
+                    session.force_reopen("Active")
+                    save_session(session)
+                    print("-> Đã mở lại phiên (state: Active).")
+                pause()
+                continue
+            print("Lỗi: phiên đã đóng, chỉ nhận 0 hoặc r.")
             pause()
             continue
 

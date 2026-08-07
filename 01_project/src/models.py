@@ -50,3 +50,11 @@ class Session(BaseModel):
             self.state = target
             return True
         return False
+
+    def force_reopen(self, target: SessionState = "Active") -> None:
+        """CHỈ dùng khi test tay v0 — ép state lùi lại để tiếp tục thao tác trên
+        một phiên đã lỡ tay đóng (Closed). Cố tình đặt tên và tách riêng khỏi
+        advance_to() để không ai nhầm đây là cách "chuyển state" bình thường —
+        nguyên tắc chỉ-tiến vẫn áp dụng cho mọi luồng vận hành thật.
+        """
+        self.state = target
