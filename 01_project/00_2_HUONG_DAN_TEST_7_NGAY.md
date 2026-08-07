@@ -1,6 +1,4 @@
 
-
-
 # Hướng dẫn sử dụng & Test 7 ngày — Personal Workspace v0 (MVP)
 
 > Tài liệu này đi kèm `00_v0_scope.md`. Mục tiêu: dùng app thật mỗi ngày trong 7 ngày liên tục để tick nốt 2 mục DoD cần thời gian thật (`OAuth refresh token`, `chạy tay 5-7 ngày`), đồng thời tự quan sát các điểm UX còn nghi vấn trước khi quyết định mở sang v1.
