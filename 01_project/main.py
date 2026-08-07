@@ -170,6 +170,49 @@ def complete_task(session, tasks):
     print(f"-> Tuyệt vời! Đã hoàn thành: '{tasks[real_idx].title}' 🎉")
 
 
+def delete_task(session, tasks):
+    if not tasks:
+        print("\nChưa có công việc nào để xóa.")
+        return
+
+    print("\n--- XÓA CÔNG VIỆC ---")
+    for i, t in enumerate(tasks):
+        status_icon = "✅" if t.status == "done" else "⏳"
+        print(f"{i + 1}. [{status_icon}] {t.title} (mood: {t.mood_affinity})")
+
+    task_choice = input(
+        f"\nChọn STT công việc muốn xóa (1-{len(tasks)}, hoặc '0' để Hủy): "
+    ).strip()
+    if task_choice == '0':
+        return
+
+    try:
+        selected_idx = int(task_choice) - 1
+    except ValueError:
+        print("Lỗi: Vui lòng nhập một con số.")
+        return
+
+    if not (0 <= selected_idx < len(tasks)):
+        print("Lỗi: Số thứ tự không hợp lệ.")
+        return
+
+    target = tasks[selected_idx]
+    confirm = input(f"Xác nhận xóa '{target.title}'? Không thể hoàn tác (y/N): ").strip().lower()
+    if confirm != 'y':
+        print("Đã hủy.")
+        return
+
+    tasks.pop(selected_idx)
+    save_tasks(tasks)
+
+    # Task có thể đã được gắn vào kế hoạch hôm nay -> gỡ luôn khỏi session cho đồng bộ
+    if target.id in session.task_ids:
+        session.task_ids.remove(target.id)
+        save_session(session)
+
+    print(f"-> Đã xóa: '{target.title}'")
+
+
 def end_of_day(session, tasks):
     print("\n--- KẾT THÚC NGÀY ---")
     confirm = input("Xác nhận đóng phiên hôm nay? Sẽ không thể mở lại. (y/N): ").strip().lower()
@@ -233,10 +276,11 @@ def main():
         print("3. Thêm công việc mới (Task)")
         print("4. Xem danh sách công việc")
         print("5. Đánh dấu hoàn thành công việc")
-        print("6. Kết thúc ngày")
+        print("6. Xóa công việc")
+        print("7. Kết thúc ngày")
         print("0. Thoát và Lưu")
 
-        choice = input("\nChọn chức năng (0-6): ").strip()
+        choice = input("\nChọn chức năng (0-7): ").strip()
 
         if choice == '0':
             print("Đã lưu dữ liệu. Tạm biệt!")
@@ -257,10 +301,13 @@ def main():
             complete_task(session, tasks)
             pause()
         elif choice == '6':
+            delete_task(session, tasks)
+            pause()
+        elif choice == '7':
             end_of_day(session, tasks)
             pause()
         else:
-            print("Lỗi: Menu không tồn tại. Vui lòng nhập số từ 0-6.")
+            print("Lỗi: Menu không tồn tại. Vui lòng nhập số từ 0-7.")
             pause()
 
 
