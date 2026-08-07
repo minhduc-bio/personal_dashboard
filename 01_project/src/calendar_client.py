@@ -46,41 +46,73 @@ def get_service():
     return build("calendar", "v3", credentials=creds)
 
 
-def list_upcoming_events(max_results=10):
-    """Đọc FixedSchedule từ Google Calendar (read-only, singleSevents=True nên
-    recurring events/RRULE đã được Google API tự expand thành từng instance).
-    Trả về list dict đã convert giờ hiển thị sang Hanoi (UTC+7).
+def list_upcoming_events(max_results=20):
+    """Đọc FixedSchedule HÔM NAY từ Google Calendar (read-only), real-time theo giờ Hanoi:
+
+    - Event chưa tới giờ bắt đầu: hiển thị bình thường với khung giờ start-end.
+    - Event đang trong khoảng start <= now <= end: hiển thị kèm nhãn "Đang diễn ra".
+    - Event đã qua giờ kết thúc (end < now): tự động ẩn khỏi danh sách trả về.
+    - Event cả ngày (all-day, không có giờ cụ thể): luôn hiển thị, không áp dụng
+      logic đang-diễn-ra/đã-kết-thúc vì không có mốc giờ để so sánh.
+
+    singleEvents=True nên recurring events/RRULE đã được Google API tự expand
+    thành từng instance riêng lẻ trước khi lọc.
     """
     service = get_service()
-    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    now_hanoi = datetime.datetime.now(HANOI_TZ)
+    start_of_day = now_hanoi.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day = start_of_day + datetime.timedelta(days=1)
+
     events_result = service.events().list(
-        calendarId="primary", timeMin=now,
+        calendarId="primary",
+        # timeMin lấy từ đầu ngày (chứ không phải từ "now") để không bỏ sót
+        # event đã bắt đầu trước "now" nhưng vẫn đang diễn ra tại thời điểm mở app.
+        timeMin=start_of_day.astimezone(datetime.timezone.utc).isoformat(),
+        timeMax=end_of_day.astimezone(datetime.timezone.utc).isoformat(),
         maxResults=max_results, singleEvents=True,
         orderBy="startTime"
     ).execute()
 
     events = []
     for e in events_result.get("items", []):
+        summary = e.get("summary", "(không tên)")
         start_raw = e["start"].get("dateTime", e["start"].get("date"))
-        events.append({
-            "summary": e.get("summary", "(không tên)"),
-            "start_display": _format_hanoi(start_raw),
-        })
+        end_raw = e["end"].get("dateTime", e["end"].get("date"))
+
+        start_dt = _parse_dt(start_raw)
+        end_dt = _parse_dt(end_raw)
+
+        if start_dt is None or end_dt is None:
+            # all-day event -> không có giờ cụ thể để so sánh, luôn hiển thị
+            events.append({"summary": summary, "start_display": "Cả ngày"})
+            continue
+
+        if end_dt < now_hanoi:
+            # đã qua giờ kết thúc -> "xóa dòng" bằng cách không đưa vào kết quả
+            continue
+
+        start_str = start_dt.astimezone(HANOI_TZ).strftime("%H:%M")
+        end_str = end_dt.astimezone(HANOI_TZ).strftime("%H:%M")
+        time_range = f"{start_str} - {end_str}"
+        if start_dt <= now_hanoi <= end_dt:
+            time_range += " (🔴 Đang diễn ra)"
+
+        events.append({"summary": summary, "start_display": time_range})
+
     return events
 
 
-def _format_hanoi(start_raw: str) -> str:
-    """Convert ISO datetime (có offset) sang giờ Hanoi để hiển thị.
-    Event dạng all-day chỉ có 'date' (không có time) thì giữ nguyên.
+def _parse_dt(raw: str):
+    """Parse chuỗi ISO datetime có offset (VD: '2026-08-07T09:00:00+07:00').
+    Trả về None nếu đây là all-day event (chỉ có 'date', không có giờ/offset).
     """
     try:
-        dt = datetime.datetime.fromisoformat(start_raw)
+        dt = datetime.datetime.fromisoformat(raw)
     except ValueError:
-        return start_raw
+        return None
     if dt.tzinfo is None:
-        # all-day event parse ra naive date -> không có timezone để convert
-        return start_raw
-    return dt.astimezone(HANOI_TZ).strftime("%Y-%m-%d %H:%M")
+        return None
+    return dt
 
 
 if __name__ == "__main__":

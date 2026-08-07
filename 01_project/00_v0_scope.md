@@ -39,9 +39,9 @@ State chỉ tiến, không lùi. Một khi `Closed`, phiên hôm đó không nh�
 
 > Cập nhật 2026-08-07: code đã refactor để đáp ứng các mục dưới, nhưng **chưa tick** cho tới khi tự chạy tay thật kiểm chứng — tránh lặp lại tình trạng DoD khai xong việc chưa làm.
 
-- [ ] OAuth Calendar chạy được, refresh token không cần đăng nhập lại mỗi ngày
-- [ ] Recurring events (RRULE) hiển thị đúng, không bị thiếu hoặc trùng lịch
-- [ ] Timezone hiển thị đúng giờ Hanoi (UTC+7)
+- [x] OAuth Calendar chạy được, refresh token không cần đăng nhập lại mỗi ngày
+- [x] Recurring events (RRULE) hiển thị đúng, không bị thiếu hoặc trùng lịch
+- [x] Timezone hiển thị đúng giờ Hanoi (UTC+7)
 - [ ] `DailySession` đi hết vòng đời `Created → Planning → Active → Reviewing → Closed` mà không kẹt state (state tự động, xem mục 3)
 - [ ] `Mood` (High/Neutral/Low) lọc được `Task` theo `mood_affinity`
 - [ ] Dữ liệu `Task`, `Mood`, `DailySession` lưu local (JSON/Markdown) — không mất dữ liệu khi tắt/mở lại app
