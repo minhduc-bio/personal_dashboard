@@ -98,3 +98,29 @@ Không implement trong v0/v1 nếu chưa cần.
 **Tóm lại: `Goal = v1`, `Schedule = v2`, `Calendar write-back = v3`.**
 
 Đây là một phân tầng khá đẹp: **v1 trả lời "tôi đang hướng tới cái gì?", v2 trả lời "tôi dành thời gian cho nó thế nào?", v3 trả lời "tôi ghi cam kết đó vào hệ thống bên ngoài thế nào?"**.
+
+v0
+Core workflow
+Task / Mood / DailySession / Calendar READ
+
+v1
+Domain expansion
+Routine / Goal / Project / DailyReview
+
+v2
+Real UI
+Dashboard / Calendar interaction
+
+v3
+Calendar WRITE + integrations
+Task ↔ Schedule ↔ Google Calendar
+
+v4+
+Personal Analytics & Self Review
+────────────────────────────────
+Historical data
+Habit / Routine analysis
+Goal progress
+Behavioral patterns
+Export → R / Python
+Monthly / yearly self-review
