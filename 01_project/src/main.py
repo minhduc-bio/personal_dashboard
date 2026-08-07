@@ -1,165 +1,221 @@
 import os
+from datetime import date
+
+from src import calendar_client
+from src.models import Task
 from src.storage import (
     init_storage,
     load_tasks,
     save_tasks,
+    get_or_create_session,
     save_session,
-    get_or_create_today_session
 )
-from src.models import Task, SESSION_STATE_FLOW
-from src.calendar_client import get_today_schedule
 
 
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 
-def advance_state(session, target_state: str):
-    """Tiến state của session ngầm theo hành động, không cho phép lùi."""
-    current_idx = SESSION_STATE_FLOW.index(session.state)
-    target_idx = SESSION_STATE_FLOW.index(target_state)
-    
-    if target_idx > current_idx:
-        session.state = target_state
+def print_header(session):
+    print("\n" + "=" * 45)
+    print(f"BẢNG ĐIỀU KHIỂN - {session.date}")
+    mood_str = f" | Mood: {session.mood}" if session.mood else ""
+    print(f"Trạng thái phiên: [{session.state}]{mood_str}")
+    print("=" * 45)
+
+
+def show_calendar():
+    print("\n--- LỊCH (Google Calendar - chỉ đọc) ---")
+    try:
+        events = calendar_client.list_upcoming_events()
+    except FileNotFoundError as e:
+        print(f"Lỗi: {e}")
+        return
+    except Exception as e:
+        print(f"Không lấy được lịch: {e}")
+        return
+
+    if not events:
+        print("Không có sự kiện sắp tới.")
+        return
+    for e in events:
+        print(f"{e['start_display']} - {e['summary']}")
+
+
+def set_mood(session):
+    print("\n--- MOOD HÔM NAY ---")
+    if session.mood:
+        print(f"Mood hiện tại: {session.mood}")
+        change = input("Đổi mood? (y/N): ").strip().lower()
+        if change != 'y':
+            return
+
+    while True:
+        mood = input("Bạn cảm thấy thế nào hôm nay (High/Neutral/Low, hoặc '0' để Hủy): ").strip()
+        if mood == '0':
+            return
+        mood = mood.capitalize()
+        if mood not in ("High", "Neutral", "Low"):
+            print("Lỗi: chỉ nhận High, Neutral hoặc Low.")
+            continue
+        session.mood = mood
+        # Đặt mood là hành động mở đầu ngày -> Planning
+        session.advance_to("Planning")
         save_session(session)
+        print(f"-> Đã ghi nhận mood: {mood}")
+        return
+
+
+def add_task(session, tasks):
+    while True:
+        title = input("\nNhập tên công việc (hoặc '0' để Hủy): ").strip()
+        if title == '0':
+            print("Đã hủy thêm công việc.")
+            return
+        if not title:
+            print("Lỗi: Tên công việc không được để trống!")
+            continue
+
+        mood_affinity = input("Task này hợp với mood nào (High/Neutral/Low): ").strip().capitalize()
+        if mood_affinity not in ("High", "Neutral", "Low"):
+            print("Lỗi: chỉ nhận High, Neutral hoặc Low.")
+            continue
+
+        new_task = Task(title=title, mood_affinity=mood_affinity)
+        tasks.append(new_task)
+        save_tasks(tasks)
+
+        session.task_ids.append(new_task.id)
+        # Thêm task vào kế hoạch ngày -> Planning
+        session.advance_to("Planning")
+        save_session(session)
+
+        print(f"-> Đã thêm thành công: '{title}' (mood: {mood_affinity})")
+        return
+
+
+def list_tasks(tasks, session):
+    print("\n--- DANH SÁCH CÔNG VIỆC ---")
+    if not tasks:
+        print("Chưa có công việc nào.")
+        return
+
+    shown = tasks
+    if session.mood:
+        do_filter = input(f"Lọc theo mood hôm nay ({session.mood})? (y/N): ").strip().lower()
+        if do_filter == 'y':
+            shown = [t for t in tasks if t.mood_affinity == session.mood]
+            if not shown:
+                print(f"Không có công việc nào hợp mood {session.mood}.")
+                return
+
+    for i, t in enumerate(shown):
+        status_icon = "✅" if t.status == "done" else "⏳"
+        print(f"{i + 1}. [{status_icon}] {t.title} (mood: {t.mood_affinity})")
+
+
+def complete_task(session, tasks):
+    pending_tasks = [(i, t) for i, t in enumerate(tasks) if t.status == 'pending']
+
+    if not pending_tasks:
+        print("\nKhông có công việc nào đang chờ xử lý.")
+        return
+
+    print("\n--- HOÀN THÀNH CÔNG VIỆC ---")
+    for idx, (_, t) in enumerate(pending_tasks):
+        print(f"{idx + 1}. {t.title} (mood: {t.mood_affinity})")
+
+    task_choice = input(
+        f"\nChọn STT công việc đã xong (1-{len(pending_tasks)}, hoặc '0' để Hủy): "
+    ).strip()
+    if task_choice == '0':
+        return
+
+    try:
+        selected_idx = int(task_choice) - 1
+    except ValueError:
+        print("Lỗi: Vui lòng nhập một con số.")
+        return
+
+    if not (0 <= selected_idx < len(pending_tasks)):
+        print("Lỗi: Số thứ tự không hợp lệ.")
+        return
+
+    real_idx = pending_tasks[selected_idx][0]
+    tasks[real_idx].status = 'done'
+    save_tasks(tasks)
+
+    # Hoàn thành task đầu tiên trong ngày -> Active (đang thực thi kế hoạch)
+    session.advance_to("Active")
+    save_session(session)
+
+    print(f"-> Tuyệt vời! Đã hoàn thành: '{tasks[real_idx].title}' 🎉")
+
+
+def end_of_day(session, tasks):
+    print("\n--- KẾT THÚC NGÀY ---")
+    confirm = input("Xác nhận đóng phiên hôm nay? Sẽ không thể mở lại. (y/N): ").strip().lower()
+    if confirm != 'y':
+        print("Đã hủy.")
+        return
+
+    session.advance_to("Reviewing")
+
+    today_ids = set(session.task_ids)
+    today_tasks = [t for t in tasks if t.id in today_ids]
+    done_count = sum(1 for t in today_tasks if t.status == 'done')
+    print(f"Tổng kết hôm nay: {done_count}/{len(today_tasks)} công việc hoàn thành.")
+
+    session.advance_to("Closed")
+    save_session(session)
+    print("-> Phiên đã đóng. Hẹn gặp lại ngày mai!")
 
 
 def main():
     init_storage()
     tasks = load_tasks()
-    
-    # Sửa lỗi crash ngày đầu tiên bằng cách dùng helper mới từ storage.py
-    session = get_or_create_today_session()
-
-    # Bổ sung Mood dialog đầu ngày nếu session chưa có mood
-    if session.mood is None:
-        print(f"\n--- CHÀO BUỔI SÁNG ({session.date}) ---")
-        while True:
-            mood_input = input("Hôm nay bạn cảm thấy thế nào? (High/Neutral/Low): ").strip().capitalize()
-            if mood_input in ["High", "Neutral", "Low"]:
-                session.mood = mood_input
-                save_session(session)
-                print(f"Đã ghi nhận trạng thái: {session.mood}")
-                break
-            else:
-                print("Lỗi: Vui lòng nhập High, Neutral hoặc Low.")
+    today_str = date.today().isoformat()
+    session = get_or_create_session(today_str)
 
     while True:
-        print("\n" + "="*45)
-        print(f"BẢNG ĐIỀU KHIỂN - {session.date}")
-        print(f"Trạng thái phiên: [{session.state}] | Năng lượng: {session.mood}")
-        print("="*45)
-        print("1. Xem lịch Google Calendar (Update!)")
-        print("2. Thêm công việc mới (Task)")
-        print("3. Xem danh sách công việc (có lọc theo Mood)")
-        print("4. Đánh dấu hoàn thành công việc")
-        print("0. Kết thúc ngày và Lưu (Thoát)")
-        
-        choice = input("\nChọn chức năng (0-4): ").strip()
-        
+        print_header(session)
+
+        if session.state == "Closed":
+            print("Phiên hôm nay đã đóng. Chỉ có thể thoát.")
+            choice = input("\nNhập 0 để thoát: ").strip()
+            if choice == '0':
+                print("Tạm biệt!")
+                break
+            print("Lỗi: phiên đã đóng, không còn thao tác nào khác.")
+            continue
+
+        print("1. Xem lịch Google Calendar")
+        print("2. Đặt / xem Mood hôm nay")
+        print("3. Thêm công việc mới (Task)")
+        print("4. Xem danh sách công việc")
+        print("5. Đánh dấu hoàn thành công việc")
+        print("6. Kết thúc ngày")
+        print("0. Thoát và Lưu")
+
+        choice = input("\nChọn chức năng (0-6): ").strip()
+
         if choice == '0':
-            # Hành động thoát/kết ngày tự động chuyển state sang Closed
-            advance_state(session, "Closed")
             print("Đã lưu dữ liệu. Tạm biệt!")
             break
-            
         elif choice == '1':
-            print("\n--- LỊCH HÔM NAY (Google Calendar) ---")
-            try:
-                # Tích hợp thật với calendar_client.py
-                schedule = get_today_schedule()
-                if not schedule:
-                    print("Không có sự kiện nào trong ngày hôm nay.")
-                else:
-                    for e in schedule:
-                        print(f"{e['start']} - {e['end']} | {e['summary']}")
-            except Exception as e:
-                print(f"Lỗi khi tải lịch: {e}")
-                
-            # Hành động xem lịch tự động đẩy trạng thái lên Planning
-            advance_state(session, "Planning")
-            
+            show_calendar()
         elif choice == '2':
-            while True:
-                title = input("\nNhập tên công việc (hoặc gõ '0' để Hủy): ").strip()
-                if title == '0':
-                    print("Đã hủy thêm công việc.")
-                    break
-                if not title:
-                    print("Lỗi: Tên công việc không được để trống!")
-                    continue
-                
-                mood = input("Mức năng lượng yêu cầu (High/Neutral/Low): ").strip().capitalize()
-                if mood not in ["High", "Neutral", "Low"]:
-                    print("Lỗi: Mức năng lượng không hợp lệ. Vui lòng nhập đúng High, Neutral hoặc Low.")
-                    continue
-                    
-                # Fix lỗi Pydantic: Đổi energy_level thành mood_affinity, bỏ id/created_at để dùng default factory
-                new_task = Task(title=title, mood_affinity=mood)
-                tasks.append(new_task)
-                
-                # Cập nhật ID task vào Session
-                session.task_ids.append(new_task.id)
-                
-                save_tasks(tasks)
-                save_session(session)
-                print(f"-> Đã thêm thành công: '{title}' (⚡ {mood})")
-                
-                # Thêm Task đẩy trạng thái lên Planning (nếu đang ở Created)
-                advance_state(session, "Planning")
-                break
-
+            set_mood(session)
         elif choice == '3':
-            print("\n--- DANH SÁCH CÔNG VIỆC ---")
-            # Tính năng lọc Task theo mood_affinity[cite: 1]
-            filter_mood = input("Nhập mức năng lượng để lọc (High/Neutral/Low) hoặc Enter để xem tất cả: ").strip().capitalize()
-            
-            display_tasks = tasks
-            if filter_mood in ["High", "Neutral", "Low"]:
-                display_tasks = [t for t in tasks if t.mood_affinity == filter_mood]
-                print(f"\n[Đang lọc các công việc yêu cầu năng lượng: {filter_mood}]")
-            elif filter_mood:
-                print("Bộ lọc không hợp lệ, hiển thị tất cả.")
-                
-            if not display_tasks:
-                print("Chưa có công việc nào khớp với điều kiện.")
-            else:
-                for i, t in enumerate(display_tasks):
-                    status_icon = "✅" if t.status == "done" else "⏳"
-                    print(f"{i+1}. [{status_icon}] {t.title} (⚡ {t.mood_affinity})")
-                    
+            add_task(session, tasks)
         elif choice == '4':
-            pending_tasks = [(i, t) for i, t in enumerate(tasks) if t.status == 'pending']
-            
-            if not pending_tasks:
-                print("\nKhông có công việc nào đang chờ xử lý.")
-                continue
-                
-            print("\n--- HOÀN THÀNH CÔNG VIỆC ---")
-            for idx, (original_idx, t) in enumerate(pending_tasks):
-                print(f"{idx + 1}. {t.title} (⚡ {t.mood_affinity})")
-            
-            try:
-                task_choice = input(f"\nChọn STT công việc đã xong (1-{len(pending_tasks)}, hoặc '0' để Hủy): ").strip()
-                if task_choice == '0':
-                    continue
-                
-                selected_idx = int(task_choice) - 1
-                if 0 <= selected_idx < len(pending_tasks):
-                    real_idx = pending_tasks[selected_idx][0]
-                    tasks[real_idx].status = 'done'
-                    save_tasks(tasks)
-                    print(f"-> Tuyệt vời! Đã hoàn thành: '{tasks[real_idx].title}' 🎉")
-                    
-                    # Hành động hoàn thành task tự động đẩy trạng thái lên Active[cite: 1]
-                    advance_state(session, "Active")
-                else:
-                    print("Lỗi: Số thứ tự không hợp lệ.")
-            except ValueError:
-                print("Lỗi: Vui lòng nhập một con số.")
-
+            list_tasks(tasks, session)
+        elif choice == '5':
+            complete_task(session, tasks)
+        elif choice == '6':
+            end_of_day(session, tasks)
         else:
-            print("Lỗi: Menu không tồn tại. Vui lòng nhập số từ 0-4.")
+            print("Lỗi: Menu không tồn tại. Vui lòng nhập số từ 0-6.")
 
 
 if __name__ == "__main__":

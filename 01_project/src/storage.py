@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 from typing import List, Optional
-from datetime import date
 
 # Nạp "bản vẽ" từ models.py
 from src.models import Task, Session
@@ -17,9 +16,11 @@ def init_storage():
     BASE_DIR.mkdir(exist_ok=True)
     SESSIONS_DIR.mkdir(exist_ok=True)
 
+    # Nếu chưa có file tasks.json, tạo một file chứa mảng rỗng []
     if not TASKS_FILE.exists():
         with open(TASKS_FILE, "w", encoding="utf-8") as f:
             json.dump([], f, ensure_ascii=False, indent=2)
+
 
 # ==========================================
 # CÁC HÀM XỬ LÝ CÔNG VIỆC (TASK)
@@ -32,14 +33,17 @@ def load_tasks() -> List[Task]:
 
     with open(TASKS_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
+        # Chuyển đổi từng dict trong list JSON thành object Pydantic Task
         return [Task(**item) for item in data]
 
 
 def save_tasks(tasks: List[Task]):
     """Lưu danh sách object Task xuống file tasks.json."""
     with open(TASKS_FILE, "w", encoding="utf-8") as f:
+        # Pydantic hỗ trợ model_dump() để chuyển Object về dict chuẩn JSON
         data = [task.model_dump() for task in tasks]
         json.dump(data, f, ensure_ascii=False, indent=2)
+
 
 # ==========================================
 # CÁC HÀM XỬ LÝ PHIÊN LÀM VIỆC (SESSION)
@@ -63,17 +67,15 @@ def save_session(session: Session):
         json.dump(session.model_dump(), f, ensure_ascii=False, indent=2)
 
 
-def get_or_create_today_session() -> Session:
-    """Lấy Session của hôm nay; nếu chưa từng chạy app hôm nay thì tạo mới
-    (state mặc định "Created") và lưu ngay xuống đĩa.
+def get_or_create_session(date_str: str) -> Session:
+    """Lấy Session của ngày `date_str`; nếu ngày đó chưa từng chạy app,
+    tạo mới một Session ở state 'Created' và lưu lại ngay.
 
-    Đây là hàm bị thiếu ở bản gốc — main.py trước đó gọi load_session()
-    không tham số và không xử lý None, khiến app crash ngay lần chạy đầu
-    trong ngày.
+    Đây là nơi xử lý case main.py trước đây gọi load_session() không có
+    tham số và không xử lý kết quả None — nay được gom về một điểm duy nhất.
     """
-    today_str = date.today().isoformat()
-    session = load_session(today_str)
+    session = load_session(date_str)
     if session is None:
-        session = Session(date=today_str)
+        session = Session(date=date_str)
         save_session(session)
     return session

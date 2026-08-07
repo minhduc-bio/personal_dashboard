@@ -1,93 +1,86 @@
+import datetime
+import os
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-import datetime
-from pathlib import Path
-from zoneinfo import ZoneInfo
 
-# v0: chỉ đọc — không có scope ghi. Ghi ngược vào Calendar là v3, chưa mở ở đây.
+# V0 — CHỈ ĐỌC. Không đổi scope này sang quyền ghi ở v0 (xem 00_v0_scope.md mục 2).
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
-# Path tương đối theo project root (không hardcode path máy cá nhân như bản gốc
-# "C:/Users/Admin/Downloads/..." — path đó vừa không portable vừa lộ thông tin máy).
-SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
-TOKEN_PATH = "token.json"
-CREDS_PATH = "credentials.json"
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(exist_ok=True)
+
+# Không hardcode path máy cá nhân (VD: C:/Users/Admin/...). Cho phép override bằng
+# biến môi trường; mặc định tìm credentials.json ở thư mục gốc project, token lưu
+# cùng chỗ với data khác của app để nhất quán với storage.py.
+CREDS_PATH = os.environ.get("GOOGLE_CREDENTIALS_PATH", "credentials.json")
+TOKEN_PATH = os.environ.get("GOOGLE_TOKEN_PATH", str(DATA_DIR / "token.json"))
 
 HANOI_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
 
 def get_service():
-    TOKEN_PATH.parent.mkdir(exist_ok=True)
     creds = None
-    if TOKEN_PATH.exists():
-        creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
+    if os.path.exists(TOKEN_PATH):
+        creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            if not CREDS_PATH.exists():
+            if not os.path.exists(CREDS_PATH):
                 raise FileNotFoundError(
-                    f"Không tìm thấy credentials.json tại {CREDS_PATH}. "
-                    "Tải file OAuth Client credentials từ Google Cloud Console và đặt ở gốc project."
+                    f"Không tìm thấy credentials.json tại '{CREDS_PATH}'. "
+                    "Đặt file ở thư mục gốc project hoặc set biến môi trường "
+                    "GOOGLE_CREDENTIALS_PATH trỏ tới đường dẫn đúng."
                 )
-            flow = InstalledAppFlow.from_client_secrets_file(str(CREDS_PATH), SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file(CREDS_PATH, SCOPES)
             creds = flow.run_local_server(port=0)
         with open(TOKEN_PATH, "w") as f:
             f.write(creds.to_json())
     return build("calendar", "v3", credentials=creds)
 
 
-def get_today_schedule() -> list[dict]:
-    """Đọc FixedSchedule của hôm nay từ Google Calendar, quy đổi giờ Hanoi (UTC+7).
-
-    singleEvents=True đã tự expand recurring events (RRULE) thành từng instance
-    riêng lẻ, nên không cần tự xử lý RRULE — đây là hành vi đúng của Google API,
-    bản gốc vốn đã dùng đúng flag này.
+def list_upcoming_events(max_results=10):
+    """Đọc FixedSchedule từ Google Calendar (read-only, singleSevents=True nên
+    recurring events/RRULE đã được Google API tự expand thành từng instance).
+    Trả về list dict đã convert giờ hiển thị sang Hanoi (UTC+7).
     """
     service = get_service()
-
-    now_hanoi = datetime.datetime.now(HANOI_TZ)
-    start_of_day = now_hanoi.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_of_day = start_of_day + datetime.timedelta(days=1)
-
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     events_result = service.events().list(
-        calendarId="primary",
-        timeMin=start_of_day.isoformat(),
-        timeMax=end_of_day.isoformat(),
-        singleEvents=True,
-        orderBy="startTime",
+        calendarId="primary", timeMin=now,
+        maxResults=max_results, singleEvents=True,
+        orderBy="startTime"
     ).execute()
 
-    schedule = []
-    for event in events_result.get("items", []):
-        raw_start = event["start"].get("dateTime", event["start"].get("date"))
-        raw_end = event["end"].get("dateTime", event["end"].get("date"))
-        schedule.append({
-            "summary": event.get("summary", "(không tên)"),
-            "start": _to_hanoi_label(raw_start),
-            "end": _to_hanoi_label(raw_end),
+    events = []
+    for e in events_result.get("items", []):
+        start_raw = e["start"].get("dateTime", e["start"].get("date"))
+        events.append({
+            "summary": e.get("summary", "(không tên)"),
+            "start_display": _format_hanoi(start_raw),
         })
-    return schedule
+    return events
 
 
-def _to_hanoi_label(raw: str) -> str:
-    """Chuyển ISO datetime (hoặc date all-day) sang giờ Hanoi để hiển thị.
-
-    Bản gốc chỉ dùng UTC khi tính timeMin và không hề convert khi hiển thị,
-    dù DoD trong 00_v0_scope.md đã tick sẵn mục "Timezone hiển thị đúng giờ Hanoi".
+def _format_hanoi(start_raw: str) -> str:
+    """Convert ISO datetime (có offset) sang giờ Hanoi để hiển thị.
+    Event dạng all-day chỉ có 'date' (không có time) thì giữ nguyên.
     """
     try:
-        dt = datetime.datetime.fromisoformat(raw)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=HANOI_TZ)
-        return dt.astimezone(HANOI_TZ).strftime("%H:%M")
+        dt = datetime.datetime.fromisoformat(start_raw)
     except ValueError:
-        # all-day event, raw dạng "YYYY-MM-DD"
-        return "Cả ngày"
+        return start_raw
+    if dt.tzinfo is None:
+        # all-day event parse ra naive date -> không có timezone để convert
+        return start_raw
+    return dt.astimezone(HANOI_TZ).strftime("%Y-%m-%d %H:%M")
 
 
 if __name__ == "__main__":
-    for e in get_today_schedule():
-        print(f"{e['start']}-{e['end']} | {e['summary']}")
+    for e in list_upcoming_events():
+        print(e["start_display"], "-", e["summary"])
