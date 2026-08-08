@@ -98,14 +98,12 @@ Vẫn CLI, chưa đụng UI thật.
 
 Ý tưởng ban đầu là dùng thẳng Calendar event làm Schedule, nhưng va vào giới hạn kiến trúc: `calendar.readonly` (mục 2) cấm mọi ghi, kể cả ghi trạng thái "đã hoàn thành" lên event, và app không thể tự tạo event mới khi Schedule bị miss (cần quyền ghi, đã chốt lùi về v3). Nên tách 2 khái niệm:
 
-||`FixedSchedule` (giữ nguyên từ v0)|`FlexibleSchedule` (mới, v1)|
+|**Tiêu chí**|**FixedSchedule (giữ nguyên từ v0)**|**FlexibleSchedule (mới, v1)**|
 |---|---|---|
-|Nguồn dữ liệu|Google Calendar (đọc từ ngoài)|App tự quản lý hoàn toàn|
-|Ai tạo|Người dùng tự tạo trên Calendar|App tự tạo khi người dùng xác nhận "muốn làm tiếp"|
-|Mục đích|Xem cam kết cố định (họp, hẹn...)|Track ý định làm Task vào lúc nào|
-|Ghi/sửa|Không (readonly)|Có — dữ liệu nội bộ app|
-
-Đánh đổi: khung giờ định làm Task sẽ không tự hiện trên Google Calendar thật, chỉ tồn tại trong app.
+|**Nguồn dữ liệu**|Google Calendar (đọc từ ngoài)|App tự quản lý hoàn toàn|
+|**Ai tạo**|Người dùng tự tạo trên Calendar|App tự tạo khi người dùng xác nhận "muốn làm tiếp"|
+|**Mục đích**|Xem cam kết cố định (họp, hẹn...)|Track ý định làm Task vào lúc nào|
+|**Ghi/sửa**|Không (readonly)|Có — dữ liệu nội bộ app|
 
 #### Mô hình: tuần tự (attempt log), không phải N-N linh hoạt
 
@@ -119,9 +117,8 @@ Tại một thời điểm, mỗi Task có **tối đa 1 FlexibleSchedule đang 
 
 #### Pause system
 
-- ⚠️ **CẦN XÁC NHẬN LẠI** — 2 điểm dưới đây là đề xuất, chưa được bạn chốt tường minh:
-    - Ngưỡng pause: **14 ngày liên tục không có Schedule nào được complete** (tính từ lần complete gần nhất, hoặc `created_at` nếu chưa từng complete) — cấu hình qua 1 hằng số (`PAUSE_THRESHOLD_DAYS`), không hardcode rải rác.
-    - Pause diễn ra **tự động** khi đạt ngưỡng (không chờ xác nhận), rồi thông báo ở lần mở app kế tiếp. Lý do: nếu chờ xác nhận, người dùng đang né tránh sẽ càng dễ bấm lơ thông báo. "Chọn từ bỏ" (theo đúng triết lý bạn đặt ra) diễn ra ở bước **Resume**, không phải ở bước Pause.
+- Ngưỡng pause: **10 ngày liên tục không có Schedule nào được complete** (tính từ lần complete gần nhất, hoặc `created_at` nếu chưa từng complete) — cấu hình qua 1 hằng số (`PAUSE_THRESHOLD_DAYS`), không hardcode rải rác.
+- Pause diễn ra **tự động** khi đạt ngưỡng (không chờ xác nhận), rồi thông báo ở lần mở app kế tiếp. Lý do: nếu chờ xác nhận, người dùng đang né tránh sẽ càng dễ bấm lơ thông báo. "Chọn từ bỏ" (theo đúng triết lý bạn đặt ra) diễn ra ở bước **Resume**, không phải ở bước Pause.
 - Task `paused` được nhóm riêng trong "Xem công việc": **⏸️ Paused** — không xóa, không lẫn với 🔴🟡⚪.
 - Action **"Tiếp tục" (Resume)**: `paused → pending`, đồng thời mở ngay prompt tạo FlexibleSchedule mới — quay lại luôn đi kèm 1 cam kết cụ thể, không "để đó tính sau" mơ hồ.
 
