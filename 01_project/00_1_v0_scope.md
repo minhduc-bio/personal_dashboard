@@ -80,45 +80,56 @@ Timezone ứng dụng (`Asia/Ho_Chi_Minh`, hiện dùng fixed offset UTC+7) đ�
 
 ## 6. Tương lai phát triển (sau khi v0 chạy ổn)
 
-### v1 — Mở rộng domain, vẫn giữ tối giản UI
+> Cập nhật 2026-08-07 (lần 3): v1 ban đầu gộp 7 khoản khác nhau — quá lớn cho 1 version. Tách lại thành **v1** (chỉ Goal + FlexibleSchedule + Warning/Pause system) và **v1.5** (phần còn lại của kế hoạch v1 cũ). `Schedule` KHÔNG phải Google Calendar event — xem lý do tách bạch ở phần "FlexibleSchedule" dưới đây.
+
+### v1 — Goal + FlexibleSchedule + Warning/Pause system
 
 ```text
-+ Workspace (container tổng, chưa cần UI riêng)
-+ Project (gắn Task vào nhiều DailySession)
-+ ResourceLink (chỉ dạng đọc — mở file Drive/local, không edit tại chỗ)
-+ DailyReview (rate mood/stress/achievement cuối ngày → ghi CSV)
-+ Reschedule cho Task (nếu Overdue-không-Reschedule gây khó chịu thật trong lúc dùng v0)
-+ Goal — Task — Schedule (domain model đầy đủ, xem chi tiết ngay dưới)
++ Goal (object mới)
++ FlexibleSchedule (object mới — native app, KHÔNG phải Google Calendar event)
++ Task: thêm goal_id (Optional), status có thêm "paused"
++ Warning system (tự động, hiện khi có Schedule bị miss)
++ Pause/Resume system (Task tự pause sau N ngày không hoạt động)
 ```
 
-Vẫn CLI hoặc UI rất đơn giản. Mục tiêu v1: domain model đầy đủ hơn nhưng **chưa đụng vào UI thật**.
+Vẫn CLI, chưa đụng UI thật.
 
-#### Domain model: Goal ≠ Task ≠ Schedule
+#### Vì sao FlexibleSchedule tách khỏi Google Calendar (FixedSchedule)
 
-Ba khái niệm tách biệt, không được gộp:
+Ý tưởng ban đầu là dùng thẳng Calendar event làm Schedule, nhưng va vào giới hạn kiến trúc: `calendar.readonly` (mục 2) cấm mọi ghi, kể cả ghi trạng thái "đã hoàn thành" lên event, và app không thể tự tạo event mới khi Schedule bị miss (cần quyền ghi, đã chốt lùi về v3). Nên tách 2 khái niệm:
 
-```text
-Task     — đại diện cho công việc cần hoàn thành
-Schedule — đại diện cho khoảng thời gian dành để thực hiện Task
-Goal     — đại diện cho việc tracking progress
-```
+||`FixedSchedule` (giữ nguyên từ v0)|`FlexibleSchedule` (mới, v1)|
+|---|---|---|
+|Nguồn dữ liệu|Google Calendar (đọc từ ngoài)|App tự quản lý hoàn toàn|
+|Ai tạo|Người dùng tự tạo trên Calendar|App tự tạo khi người dùng xác nhận "muốn làm tiếp"|
+|Mục đích|Xem cam kết cố định (họp, hẹn...)|Track ý định làm Task vào lúc nào|
+|Ghi/sửa|Không (readonly)|Có — dữ liệu nội bộ app|
 
-**Quan hệ:**
+Đánh đổi: khung giờ định làm Task sẽ không tự hiện trên Google Calendar thật, chỉ tồn tại trong app.
 
-- 1 Task có thể có **nhiều** Schedule.
-- 1 Goal có thể có **nhiều** Task (cụ thể là nhiều Task-goal-directed — xem dưới).
-- Task tồn tại **độc lập** với Schedule — Schedule có thể được tạo, thay đổi, hoặc xóa mà **không làm mất Task**. Schedule chỉ tạo ra một khoảng thời gian cụ thể để thực hiện Task, không phải bản thân Task.
+#### Mô hình: tuần tự (attempt log), không phải N-N linh hoạt
 
-**Task-to-do vs Task-goal-directed — quan hệ tập con (subtype), không phải 2 loại loại-trừ-nhau:**
+Tại một thời điểm, mỗi Task có **tối đa 1 FlexibleSchedule đang "chờ"** (pending). Khi Schedule đó bị miss (qua giờ kết thúc mà chưa complete), Task được đánh dấu "đã miss lần này"; người dùng được hỏi có muốn tạo Schedule mới (dời sang khi nào) hay bỏ qua. Đây **không phải** quan hệ nhiều-nhiều tự do kiểu đặt trước nhiều buổi cùng lúc — chọn tuần tự vì: (1) khớp đúng ví dụ gốc bạn đưa ra, (2) Warning tự động (Q5) đơn giản hơn hẳn — chỉ cần hỏi "Schedule đang chờ của Task này đã qua giờ chưa", (3) giữ v1 ở mức CLI, không cần màn hình quản lý lịch riêng.
+
+#### Warning system
+
+- **Header (tự động, mọi lần mở app):** 1 dòng ngắn nếu có Schedule bị miss chưa xử lý. VD: `⚠️ 2 lịch bị bỏ lỡ`.
+- **Chi tiết (khi vào "Xem công việc" hoặc chọn xử lý trực tiếp):** prompt đầy đủ — _"Dời sang khi nào? (1) Ngày mai cùng giờ (2) Chọn ngày/giờ khác (3) Bỏ qua"_.
+- Không chặn màn hình (không phải modal bắt buộc OK) — cảnh báo luôn hiện diện nhưng không cưỡng ép xử lý ngay.
+
+#### Pause system
+
+- ⚠️ **CẦN XÁC NHẬN LẠI** — 2 điểm dưới đây là đề xuất, chưa được bạn chốt tường minh:
+    - Ngưỡng pause: **14 ngày liên tục không có Schedule nào được complete** (tính từ lần complete gần nhất, hoặc `created_at` nếu chưa từng complete) — cấu hình qua 1 hằng số (`PAUSE_THRESHOLD_DAYS`), không hardcode rải rác.
+    - Pause diễn ra **tự động** khi đạt ngưỡng (không chờ xác nhận), rồi thông báo ở lần mở app kế tiếp. Lý do: nếu chờ xác nhận, người dùng đang né tránh sẽ càng dễ bấm lơ thông báo. "Chọn từ bỏ" (theo đúng triết lý bạn đặt ra) diễn ra ở bước **Resume**, không phải ở bước Pause.
+- Task `paused` được nhóm riêng trong "Xem công việc": **⏸️ Paused** — không xóa, không lẫn với 🔴🟡⚪.
+- Action **"Tiếp tục" (Resume)**: `paused → pending`, đồng thời mở ngay prompt tạo FlexibleSchedule mới — quay lại luôn đi kèm 1 cam kết cụ thể, không "để đó tính sau" mơ hồ.
+
+#### Task-goal-directed & Goal
 
 > Task-goal-directed là Task-to-do, nhưng Task-to-do không phải (bắt buộc) là Task-goal-directed.
 
-- **Task-to-do**: có thể tự phát sinh trong ngày/tuần để giải quyết một việc cụ thể, không bắt buộc thuộc Goal nào, tồn tại độc lập, có thể Overdue trong 1 khoảng thời gian không quá cụ thể (ngày/tuần).
-- **Task-goal-directed**: là Task-to-do có thêm ràng buộc — phải thuộc ít nhất 1 Goal, đóng vai trò checkpoint để tracking progress của Goal đó.
-
-Vì đây là quan hệ tập con chứ không phải 2 class riêng biệt, cách mô hình hóa hợp lý nhất: `Task` thêm 1 field tùy chọn kiểu `goal_id: Optional[str]` — có giá trị nghĩa là Task-goal-directed, `None` nghĩa là Task-to-do thuần. **Không cần** tách thành 2 model/2 Literal type khác nhau.
-
-**Goal:**
+`Task` thêm field `goal_id: Optional[str]` — có giá trị nghĩa là Task-goal-directed (checkpoint của 1 Goal), `None` nghĩa là Task-to-do thuần. Không tách 2 model/2 Literal type riêng.
 
 ```text
 Goal
@@ -127,27 +138,42 @@ Goal
 └── ...
 ```
 
-Người dùng set các checkpoint cho Goal chính là các Task-goal-directed này; progress của Goal hiển thị dựa trên completion của chúng.
+#### Progress — derived, không lưu field riêng
 
-**Lưu ý implement (khi tới lúc, KHÔNG phải bây giờ):**
+- `Goal.progress` = % Task-goal-directed (theo `goal_id`) đã `done`.
+- `Task.progress` = % FlexibleSchedule của Task đó đã hoàn thành (VD hiển thị: `Task A [3/5 buổi đã hoàn thành]`).
+- Hoàn thành 1 FlexibleSchedule **không** tự động đánh dấu Task `done` — 2 việc tách biệt hoàn toàn (complete Schedule = điểm danh 1 buổi; complete Task = qua menu Complete như v0).
+- Cả 2 progress đều tính lúc hiển thị (derived), không lưu thành field — tránh 2 nguồn sự thật (lý do tương tự việc bỏ `session.task_ids` ở mục 4).
 
-- `Schedule` tách khỏi `Task` ở v1 thực chất là **thay thế** cách `Task.scheduled_date` đang hoạt động ở v0 (hiện là 1 field ngày đơn, gắn thẳng vào Task) — không phải cộng thêm bên cạnh. Khi lên v1, cần quyết định: giữ `scheduled_date` làm field tiện lợi (derive từ Schedule sớm nhất) hay bỏ hẳn, chuyển toàn bộ logic Overdue/Today/Unscheduled sang truy vấn qua bảng `Schedule` riêng.
-- `Goal` là object hoàn toàn mới, chưa từng tồn tại ở v0 — cần model, storage, và ít nhất 1-2 action CRUD riêng (tạo Goal, gắn Task vào Goal, xem progress).
+#### Không migrate dữ liệu từ v0
+
+Dữ liệu test 5-7 ngày ở v0 là dữ liệu test thuần, chưa có impact thật — khi lên v1, xóa `data/` và bắt đầu sạch, không viết script chuyển `Task.scheduled_date` → `FlexibleSchedule`.
+
+### v1.5 — Phần còn lại của kế hoạch v1 cũ
+
+```text
++ Workspace (container tổng, chưa cần UI riêng)
++ Project (gắn Task vào nhiều DailySession)
++ ResourceLink (chỉ dạng đọc — mở file Drive/local, không edit tại chỗ)
++ DailyReview (rate mood/stress/achievement cuối ngày → ghi CSV)
+```
+
+Reschedule (từng dự kiến ở v1 cũ) coi như đã được giải quyết một phần bởi FlexibleSchedule ở v1 — "dời sang khi nào" chính là hành vi reschedule.
 
 ### v2 — UI thật (TypeScript, xây bằng Bolt AI)
 
 ```text
 + Giao diện Dashboard: Start of Day / During Day / End of Day
 + Mood picker dạng dialog
-+ Calendar view (Today/Week/Month) kéo-thả Task vào Schedule
-+ Kết nối UI với backend v0/v1 qua API nội bộ (REST hoặc tRPC)
++ Calendar view (Today/Week/Month) kéo-thả Task vào FlexibleSchedule
++ Kết nối UI với backend v0/v1/v1.5 qua API nội bộ (REST hoặc tRPC)
 ```
 
 Lưu ý khi vibe code UI bằng Bolt AI:
 
-- Backend (auth, state machine) **giữ nguyên đã test ở v0/v1** — Bolt AI chỉ nên chạm vào phần UI/API layer, không viết lại logic domain đã ổn định.
-- TypeScript giúp bắt lỗi kiểu dữ liệu giữa UI và API response (đặc biệt hữu ích khi domain model nhiều entity như `Goal`/`Task`/`Schedule` ở trên), nhưng không thay được việc test tay các luồng OAuth/timezone đã nêu ở mục 5.
-- Nên định nghĩa API contract (request/response shape của `DailySession`, `Task`, `Mood`, `Goal`, `Schedule`) thành file `.ts` types **trước khi** để Bolt AI generate UI, để tránh UI và backend lệch schema.
+- Backend (auth, state machine, Warning/Pause logic) **giữ nguyên đã test ở các version trước** — Bolt AI chỉ nên chạm vào phần UI/API layer, không viết lại logic domain đã ổn định.
+- TypeScript giúp bắt lỗi kiểu dữ liệu giữa UI và API response (đặc biệt hữu ích khi domain nhiều entity như `Goal`/`Task`/`FlexibleSchedule` ở trên), nhưng không thay được việc test tay các luồng OAuth/timezone/Pause đã nêu.
+- Nên định nghĩa API contract (`DailySession`, `Task`, `Mood`, `Goal`, `FlexibleSchedule`) thành file `.ts` types **trước khi** để Bolt AI generate UI, tránh UI và backend lệch schema.
 
 ### v3 — Ghi ngược & tích hợp mở rộng
 
@@ -157,7 +183,7 @@ Lưu ý khi vibe code UI bằng Bolt AI:
 + Sandbox tạm cho note trong ngày
 ```
 
-Đây là lúc rủi ro ghi-đè dữ liệu thật xuất hiện trở lại — chỉ mở sau khi v0-v2 đã dùng thật, ổn định. Điều kiện tối thiểu trước khi mở: đổi OAuth scope sang quyền ghi (`calendar` thay vì `calendar.readonly`), và `Task` cần thêm field thời gian (`deadline`, `estimated_duration`) để có đủ dữ liệu tạo Calendar Event hợp lệ.
+Đây là lúc rủi ro ghi-đè dữ liệu thật xuất hiện trở lại — chỉ mở sau khi các version trước đã dùng thật, ổn định. Điều kiện tối thiểu trước khi mở: đổi OAuth scope sang quyền ghi (`calendar` thay vì `calendar.readonly`), và `Task` cần thêm field thời gian (`deadline`, `estimated_duration`) để có đủ dữ liệu tạo Calendar Event hợp lệ.
 
 ### v4+ — Tính năng phụ trợ
 
@@ -173,4 +199,5 @@ OneNote link
 - Nếu AI (Claude, Bolt AI, hay bất kỳ) tự đề xuất thêm tính năng "cho tiện", đối chiếu với file này trước khi chấp nhận.
 - File này có thể sửa, nhưng sửa là quyết định có chủ đích — không để nó tự phình ra qua từng prompt.
 - Khi một thay đổi đủ lớn để làm thay đổi bản chất workflow đang test (như Task Lifecycle ở mục 4), reset lại đồng hồ DoD thay vì cộng dồn ngày test cũ — ngày test trên 1 workflow đã đổi bản chất không còn phản ánh đúng workflow hiện tại.
-- Ý tưởng được ghi nhận vào mục "Tương lai phát triển" (như Goal-Task-Schedule ở mục 6) là **tài liệu thiết kế**, không phải giấy phép implement — vẫn phải chờ đúng version và đúng DoD mới bắt tay code.
+- Ý tưởng được ghi nhận vào mục "Tương lai phát triển" (như Goal-Task-FlexibleSchedule ở mục 6) là **tài liệu thiết kế**, không phải giấy phép implement — vẫn phải chờ đúng version và đúng DoD mới bắt tay code.
+- Chỗ nào trong tài liệu còn đánh dấu ⚠️ **CẦN XÁC NHẬN LẠI**, không code phần đó cho tới khi được xác nhận tường minh — không tự suy diễn "chắc là đồng ý" từ việc im lặng.
