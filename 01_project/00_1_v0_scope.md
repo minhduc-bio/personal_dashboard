@@ -66,15 +66,15 @@ Timezone ứng dụng (`Asia/Ho_Chi_Minh`, hiện dùng fixed offset UTC+7) đ�
 
 > Cập nhật 2026-08-07 (lần 2): Task Lifecycle ở mục 4 vừa thay đổi khá căn bản cách Task vận hành (Global thay vì ngầm-định gắn-theo-session, thêm Overdue, tách Complete/Delete) — **quyết định chủ đích reset lại DoD về chưa tick**, vì workflow đang được kiểm chứng đã đổi bản chất giữa chừng, không thể tính tiếp những ngày test trước đó.
 
-- [ ] OAuth Calendar chạy được, refresh token không cần đăng nhập lại mỗi ngày _(cần vài ngày thật mới lộ ra)_
-- [ ] Recurring events (RRULE) hiển thị đúng, không bị thiếu hoặc trùng lịch
-- [ ] Timezone hiển thị đúng giờ Hanoi (UTC+7), kể cả quanh mốc nửa đêm
-- [ ] `DailySession` đi hết vòng đời `Created → Planning → Active → Reviewing → Closed` mà không kẹt state (state tự động, xem mục 3)
-- [ ] `Mood` (High/Neutral/Low) lọc được `Task` theo `mood_affinity` (chỉ áp cho Today/Unscheduled, Overdue luôn hiện đủ)
-- [ ] Task Overdue/Today/Unscheduled hiển thị đúng nhóm, đúng theo giờ local
-- [ ] Complete và Delete hoạt động đúng, không lẫn lộn ý nghĩa dữ liệu
-- [ ] Dữ liệu `Task`, `Mood`, `DailySession` lưu local (JSON) — không mất dữ liệu khi tắt/mở lại app
-- [ ] Đã tự chạy tay ít nhất 5-7 ngày liên tục để kiểm chứng workflow, không chỉ test 1 lần
+- [x] OAuth Calendar chạy được, refresh token không cần đăng nhập lại mỗi ngày _(cần vài ngày thật mới lộ ra)_
+- [x] Recurring events (RRULE) hiển thị đúng, không bị thiếu hoặc trùng lịch
+- [x] Timezone hiển thị đúng giờ Hanoi (UTC+7), kể cả quanh mốc nửa đêm
+- [x] `DailySession` đi hết vòng đời `Created → Planning → Active → Reviewing → Closed` mà không kẹt state (state tự động, xem mục 3)
+- [x] `Mood` (High/Neutral/Low) lọc được `Task` theo `mood_affinity` (chỉ áp cho Today/Unscheduled, Overdue luôn hiện đủ)
+- [x] Task Overdue/Today/Unscheduled hiển thị đúng nhóm, đúng theo giờ local
+- [x] Complete và Delete hoạt động đúng, không lẫn lộn ý nghĩa dữ liệu
+- [x] Dữ liệu `Task`, `Mood`, `DailySession` lưu local (JSON) — không mất dữ liệu khi tắt/mở lại app
+- [x] Đã tự chạy tay ít nhất 5-7 ngày liên tục để kiểm chứng workflow, không chỉ test 1 lần
 
 **Chỉ khi tick hết mục trên mới được mở sang v1.**
 

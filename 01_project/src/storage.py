@@ -3,11 +3,13 @@ from pathlib import Path
 from typing import List, Optional
 
 # Nạp "bản vẽ" từ models.py
-from src.models import Task, Session
+from src.models import Task, Session, Goal, FlexibleSchedule
 
 # Định nghĩa các đường dẫn thư mục lưu trữ
 BASE_DIR = Path("data")
 TASKS_FILE = BASE_DIR / "tasks.json"
+GOALS_FILE = BASE_DIR / "goals.json"
+SCHEDULES_FILE = BASE_DIR / "schedules.json"
 SESSIONS_DIR = BASE_DIR / "sessions"
 
 
@@ -16,10 +18,10 @@ def init_storage():
     BASE_DIR.mkdir(exist_ok=True)
     SESSIONS_DIR.mkdir(exist_ok=True)
 
-    # Nếu chưa có file tasks.json, tạo một file chứa mảng rỗng []
-    if not TASKS_FILE.exists():
-        with open(TASKS_FILE, "w", encoding="utf-8") as f:
-            json.dump([], f, ensure_ascii=False, indent=2)
+    for f in (TASKS_FILE, GOALS_FILE, SCHEDULES_FILE):
+        if not f.exists():
+            with open(f, "w", encoding="utf-8") as fh:
+                json.dump([], fh, ensure_ascii=False, indent=2)
 
 
 # ==========================================
@@ -81,3 +83,35 @@ def get_or_create_session(date_str: str) -> Session:
         session = Session(date=date_str)
         save_session(session)
     return session
+
+
+# ==========================================
+# CÁC HÀM XỬ LÝ GOAL (v1)
+# ==========================================
+
+def load_goals() -> List[Goal]:
+    if not GOALS_FILE.exists():
+        return []
+    with open(GOALS_FILE, "r", encoding="utf-8") as f:
+        return [Goal(**item) for item in json.load(f)]
+
+
+def save_goals(goals: List[Goal]):
+    with open(GOALS_FILE, "w", encoding="utf-8") as f:
+        json.dump([g.model_dump(mode="json") for g in goals], f, ensure_ascii=False, indent=2)
+
+
+# ==========================================
+# CÁC HÀM XỬ LÝ FLEXIBLE SCHEDULE (v1)
+# ==========================================
+
+def load_schedules() -> List[FlexibleSchedule]:
+    if not SCHEDULES_FILE.exists():
+        return []
+    with open(SCHEDULES_FILE, "r", encoding="utf-8") as f:
+        return [FlexibleSchedule(**item) for item in json.load(f)]
+
+
+def save_schedules(schedules: List[FlexibleSchedule]):
+    with open(SCHEDULES_FILE, "w", encoding="utf-8") as f:
+        json.dump([s.model_dump(mode="json") for s in schedules], f, ensure_ascii=False, indent=2)

@@ -93,15 +93,15 @@ Hôm sau mở lại app, `main.py` tự nhận diện ngày mới, tạo `DailyS
 
 Điền lại mỗi ngày — đây là bằng chứng thực tế để tick DoD, không phải hình thức.
 
-|Ngày|Đã dùng thật?|OAuth có phải đăng nhập lại không?|Vấn đề gặp phải|Ghi chú UX|
-|---|---|---|---|---|
-|1|||||
-|2|||||
-|3|||||
-|4|||||
-|5|||||
-|6|||||
-|7|||||
+| Ngày | Đã dùng thật? | OAuth có phải đăng nhập lại không? | Vấn đề gặp phải | Ghi chú UX |
+| ---- | ------------- | ---------------------------------- | --------------- | ---------- |
+| 1    | Có            | Không                              | Không           |            |
+| 2    | Có            | Không                              | Không           |            |
+| 3    | Có            | Không                              |                 |            |
+| 4    |               |                                    |                 |            |
+| 5    |               |                                    |                 |            |
+| 6    |               |                                    |                 |            |
+| 7    |               |                                    |                 |            |
 
 ## 4.1. Các điểm cần chủ ý quan sát trong 7 ngày này
 
@@ -120,13 +120,13 @@ Hôm sau mở lại app, `main.py` tự nhận diện ngày mới, tạo `DailyS
 
 # 5. Lỗi thường gặp
 
-|Lỗi|Nguyên nhân|Cách xử lý|
-|---|---|---|
-|`ModuleNotFoundError: No module named 'src'`|Đang chạy `python main.py` hoặc `python calendar_client.py` từ **trong** thư mục `src`, hoặc `main.py` bị đặt nhầm vào `src`|Luôn `cd` về `01_project` (thư mục cha) rồi mới chạy `python main.py`|
-|`ZoneInfoNotFoundError: No time zone found with key Asia/Ho_Chi_Minh`|Đã fix — app không còn dùng `zoneinfo`, chuyển sang fixed offset UTC+7 trong `src/timezone.py`|Nếu vẫn gặp, kiểm tra `calendar_client.py` có đang import đúng `from src.timezone import APP_TZ` không|
-|`FileNotFoundError: Không tìm thấy credentials.json`|File OAuth credentials chưa đặt đúng chỗ|Đặt `credentials.json` ngay tại `01_project/`, hoặc set biến môi trường `GOOGLE_CREDENTIALS_PATH` trỏ tới đường dẫn khác|
-|`ValidationError` khi load `tasks.json`|File `tasks.json` cũ được tạo từ phiên bản model trước (thiếu `scheduled_date`/`completed_at` dạng datetime)|Với dữ liệu test, đơn giản nhất là xóa `data/tasks.json` và `data/sessions/` để bắt đầu lại sạch — vì đang trong giai đoạn test, chưa phải dữ liệu cần giữ|
-|Popup "Google chưa xác minh ứng dụng này" khi đăng nhập lại|OAuth consent screen đang ở chế độ "Testing"|Bình thường với app cá nhân — bấm "Advanced" → "Go to (tên app) (unsafe)" để tiếp tục|
+| Lỗi                                                                   | Nguyên nhân                                                                                                                  | Cách xử lý                                                                                                                                                 |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ModuleNotFoundError: No module named 'src'`                          | Đang chạy `python main.py` hoặc `python calendar_client.py` từ **trong** thư mục `src`, hoặc `main.py` bị đặt nhầm vào `src` | Luôn `cd` về `01_project` (thư mục cha) rồi mới chạy `python main.py`                                                                                      |
+| `ZoneInfoNotFoundError: No time zone found with key Asia/Ho_Chi_Minh` | Đã fix — app không còn dùng `zoneinfo`, chuyển sang fixed offset UTC+7 trong `src/timezone.py`                               | Nếu vẫn gặp, kiểm tra `calendar_client.py` có đang import đúng `from src.timezone import APP_TZ` không                                                     |
+| `FileNotFoundError: Không tìm thấy credentials.json`                  | File OAuth credentials chưa đặt đúng chỗ                                                                                     | Đặt `credentials.json` ngay tại `01_project/`, hoặc set biến môi trường `GOOGLE_CREDENTIALS_PATH` trỏ tới đường dẫn khác                                   |
+| `ValidationError` khi load `tasks.json`                               | File `tasks.json` cũ được tạo từ phiên bản model trước (thiếu `scheduled_date`/`completed_at` dạng datetime)                 | Với dữ liệu test, đơn giản nhất là xóa `data/tasks.json` và `data/sessions/` để bắt đầu lại sạch — vì đang trong giai đoạn test, chưa phải dữ liệu cần giữ |
+| Popup "Google chưa xác minh ứng dụng này" khi đăng nhập lại           | OAuth consent screen đang ở chế độ "Testing"                                                                                 | Bình thường với app cá nhân — bấm "Advanced" → "Go to (tên app) (unsafe)" để tiếp tục                                                                      |
 
 ---
 
